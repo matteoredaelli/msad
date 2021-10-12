@@ -39,17 +39,31 @@ def remove_member(
     return conn.extend.microsoft.remove_members_to_groups(user_dn, group_dn)
 
 
-def group_members(conn, search_base, limit, group_name=None, group_dn=None):
+def group_flat_members(conn, search_base, limit, group_name=None, group_dn=None):
     if group_name:
         group_dn = get_dn(conn, search_base, group_name)
 
-    print(group_dn)
     filter = f"(&(objectClass=person)(sAMAccountName=*)(memberOf:1.2.840.113556.1.4.1941:={group_dn}))"
     conn.search(
         search_base,
         filter,
         size_limit=limit,
         attributes=["distinguishedname"],
+    )
+    result = conn.response
+    return result
+
+
+def group_members(conn, search_base, group_name=None, group_dn=None):
+    if group_name:
+        group_dn = get_dn(conn, search_base, group_name)
+
+    filter = f"(distinguishedName={group_dn})"
+    conn.search(
+        group_dn,
+        filter,
+        size_limit=1,
+        attributes=["member"],
     )
     result = conn.response
     return result

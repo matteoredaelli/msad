@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import sys
 import msad
 import fire
 import ldap3
@@ -41,7 +42,7 @@ def _get_connection_krb(host, port, use_ssl):
         sasl_mechanism=ldap3.KERBEROS,
         auto_bind=False,
     )
-    conn.bind()
+    # conn.bind()
     return conn
 
 
@@ -49,15 +50,18 @@ def _get_connection_user_pwd(host, port, use_ssl, user, password):
     server = ldap3.Server(host, port, use_ssl)
 
     conn = ldap3.Connection(server, user=user, password=password, auto_bind=False)
-    conn.bind()
+    # conn.bind()
     return conn
 
 
 def _get_connection(host, port, use_ssl, sso, user, password):
-    if sso:
-        return _get_connection_krb(host, port, use_ssl)
+    if user and password:
+        conn = _get_connection_user_pwd(host, port, use_ssl, user, password)
     else:
-        return _get_connection_user_pwd(host, port, use_ssl, user, password)
+        conn = _get_connection_krb(host, port, use_ssl)
+
+    conn.bind()
+    return conn
 
 
 class AD:
@@ -71,7 +75,7 @@ class AD:
         sso=True,
         user=None,
         password=None,
-        search_limit=0,
+        limit=0,
         attributes=None,
         out_format="json",
         sep=";",
@@ -79,7 +83,7 @@ class AD:
         self._conn = _get_connection(host, port, use_ssl, sso, user, password)
         self._attributes = attributes
         self._sep = sep
-        self._search_limit = search_limit
+        self._limit = limit
         self._out_format = out_format
 
     def search(self, search_base, search_filter):
@@ -110,37 +114,39 @@ class AD:
         result = msad.users(self._conn, search_base, user, attributes=self._attributes)
         return self.pprint(result)
 
-    def group_members(self, search_base, group_name=None, group_dn=None):
-        result = msad.group_members(
-            self._conn, search_base, self._search_limit, group_name, group_dn
+    def group_flat_members(self, search_base, group_name=None, group_dn=None):
+        result = msad.group_flat_members(
+            self._conn, search_base, self._limit, group_name, group_dn
         )
         return self.pprint(result)
 
+    def group_members(self, search_base, group_name=None, group_dn=None):
+        result = msad.group_members(self._conn, search_base, group_name, group_dn)
+        return self.pprint(result)
 
-def add_member(
-    self, search_base, group_name=None, group_dn=None, user_name=None, user_dn=None
-):
-    return msad.add_member(
-        conn=self._conn,
-        search_base=search_base,
-        group_name=group_name,
-        group_dn=group_dn,
-        user_name=user_name,
-        user_dn=user_dn,
-    )
+    def add_member(
+        self, search_base, group_name=None, group_dn=None, user_name=None, user_dn=None
+    ):
+        return msad.add_member(
+            conn=self._conn,
+            search_base=search_base,
+            group_name=group_name,
+            group_dn=group_dn,
+            user_name=user_name,
+            user_dn=user_dn,
+        )
 
-
-def remove_member(
-    self, search_base, group_name=None, group_dn=None, user_name=None, user_dn=None
-):
-    return remove_member(
-        conn=self._conn,
-        search_base=search_base,
-        group_name=group_name,
-        group_dn=group_dn,
-        user_name=user_name,
-        user_dn=user_dn,
-    )
+    def remove_member(
+        self, search_base, group_name=None, group_dn=None, user_name=None, user_dn=None
+    ):
+        return remove_member(
+            conn=self._conn,
+            search_base=search_base,
+            group_name=group_name,
+            group_dn=group_dn,
+            user_name=user_name,
+            user_dn=user_dn,
+        )
 
 
 BANNER = """
