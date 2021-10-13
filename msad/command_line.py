@@ -14,8 +14,9 @@
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# along with this program.  If not, see <https://www.gnu.org/licenses/>
 
+import datetime
 import sys
 import msad
 import fire
@@ -30,6 +31,7 @@ def _json_converter(o):
         return o.__str__()
     elif isinstance(o, list):
         return ";".join(o)
+    # else return o
 
 
 def _get_connection_krb(host, port, use_ssl):
@@ -113,6 +115,12 @@ class AD:
         """
         result = msad.users(self._conn, search_base, user, attributes=self._attributes)
         return self.pprint(result)
+
+    def expired_password(self, search_base, user, max_age):
+        """Search users inside AD
+        filter: is the cn or userPrincipalName or samaccoutnname or mail to be searched. Can contain *
+        """
+        return msad.expired_password(self._conn, search_base, user, max_age)
 
     def group_flat_members(self, search_base, group_name=None, group_dn=None):
         result = msad.group_flat_members(

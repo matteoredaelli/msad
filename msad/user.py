@@ -18,6 +18,7 @@
 
 import getpass
 import ldap3
+import datetime
 
 
 def _enter_password(text):
@@ -38,3 +39,21 @@ def change_password(conn):
     newpwd2 = _enter_password("New password (check): ")
     if newpwd == newpwd2:
         conn.extend.microsoft.modify_password(user, newpwd, oldpwd)
+
+
+def expired_password(conn, search_base, user, max_age):
+    conn.search(
+        search_base,
+        f"(samaccountname={user})",
+        size_limit=1,
+        attributes=["pwdLastSet"],
+    )
+    result = conn.response[0]["attributes"]["pwdLastSet"]
+    now = datetime.datetime.now()
+
+    if result == 0:
+        return True
+    else:
+        delta = now - result.replace(tzinfo=None)
+        days = delta.days
+        return True if days > max_age else False
