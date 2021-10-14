@@ -26,12 +26,16 @@ Retreive info about a user
 
 ```bash
 msad check_user matteo 90 \[qliksense_analyzer,qliksense_professional\] 2>/dev/null
+```
+
+```json
 {"is_disabled": false}
 {"is_locked": false}
 {"has_never_expires_password": false}
 {"has_expired_password": false}
 {"membership_qliksense_analyzer": false}
 {"membership_qliksense_professional": true}
+```
 
 ## License
 
