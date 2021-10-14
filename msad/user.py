@@ -1,6 +1,6 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
-# AD - Active Directory tool
+# msad - Active Directory tool
 # Copyright (C) 2020 - matteo.redaelli@gmail.com
 
 # This program is free software: you can redistribute it and/or modify
@@ -19,6 +19,8 @@
 import getpass
 import ldap3
 import datetime
+from .search import *
+from .group import *
 
 
 def _enter_password(text):
@@ -41,14 +43,39 @@ def change_password(conn):
         conn.extend.microsoft.modify_password(user, newpwd, oldpwd)
 
 
-def expired_password(conn, search_base, user, max_age):
+def is_disabled(conn, search_base, user):
+    result = disabled_users(
+        conn, search_base, f"(samaccountname={user})", limit=1, attributes=None
+    )
+    logging.debug(result)
+    return True if len(result) == 1 else False
+
+
+def is_locked(conn, search_base, user):
+    result = locked_users(
+        conn, search_base, f"(samaccountname={user})", limit=1, attributes=None
+    )
+    return True if len(result) == 1 else False
+
+
+def has_never_expires_password(conn, search_base, user):
+    result = never_expires_password(
+        conn, search_base, f"(samaccountname={user})", limit=1, attributes=None
+    )
+    return True if len(result) == 1 else False
+
+
+def has_expired_password(conn, search_base, user, max_age):
     conn.search(
         search_base,
         f"(samaccountname={user})",
         size_limit=1,
         attributes=["pwdLastSet"],
     )
+    if len(conn.entries) == 0:
+        return None
     result = conn.response[0]["attributes"]["pwdLastSet"]
+    logging.info(f"Password changed at {result}")
     now = datetime.datetime.now()
 
     if result == 0:
@@ -57,3 +84,27 @@ def expired_password(conn, search_base, user, max_age):
         delta = now - result.replace(tzinfo=None)
         days = delta.days
         return True if days > max_age else False
+
+
+def check_user(conn, search_base, user, max_age, groups=[]):
+    # result = {}
+    yield ({"is_disabled": is_disabled(conn, search_base, user)})
+    yield ({"is_locked": is_locked(conn, search_base, user)})
+    yield (
+        {
+            "has_never_expires_password": has_never_expires_password(
+                conn, search_base, user
+            )
+        }
+    )
+    yield (
+        {"has_expired_password": has_expired_password(conn, search_base, user, max_age)}
+    )
+    for group in groups:
+        yield (
+            {
+                f"membership_{group}": group_member(
+                    conn, search_base, group_name=group, user_name=user
+                )
+            }
+        )

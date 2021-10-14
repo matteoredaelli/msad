@@ -34,14 +34,24 @@ def remove_member(
 ):
     if group_name:
         group_dn = get_dn(conn, search_base, group_name)
+
+    if not group_dn:
+        return None
     if user_name:
         user_dn = get_dn(conn, search_base, user_name)
+
+    if not user_dn:
+        return None
+
     return conn.extend.microsoft.remove_members_to_groups(user_dn, group_dn)
 
 
 def group_flat_members(conn, search_base, limit, group_name=None, group_dn=None):
     if group_name:
         group_dn = get_dn(conn, search_base, group_name)
+
+    if not group_dn:
+        return None
 
     filter = f"(&(objectClass=person)(sAMAccountName=*)(memberOf:1.2.840.113556.1.4.1941:={group_dn}))"
     conn.search(
@@ -57,6 +67,8 @@ def group_flat_members(conn, search_base, limit, group_name=None, group_dn=None)
 def group_members(conn, search_base, group_name=None, group_dn=None):
     if group_name:
         group_dn = get_dn(conn, search_base, group_name)
+    if not group_dn:
+        return None
 
     filter = f"(distinguishedName={group_dn})"
     conn.search(
@@ -67,3 +79,23 @@ def group_members(conn, search_base, group_name=None, group_dn=None):
     )
     result = conn.response
     return result
+
+
+def group_member(
+    conn, search_base, group_name=None, group_dn=None, user_name=None, user_dn=None
+):
+    if group_name:
+        group_dn = get_dn(conn, search_base, group_name)
+    if not group_dn:
+        return None
+
+    if user_name:
+        user_dn = get_dn(conn, search_base, user_name)
+    if not user_dn:
+        return None
+
+    filter = f"(&(memberOf:1.2.840.113556.1.4.1941:={group_dn})(objectCategory=person)(objectClass=user)(distinguishedName={user_dn}))"
+    conn.search(search_base, filter, size_limit=1, attributes=None)
+    result = conn.entries
+    logging.debug(result)
+    return True if len(result) == 1 else False
