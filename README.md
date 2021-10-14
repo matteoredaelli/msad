@@ -6,9 +6,32 @@ msad is a library and command line tool for working with an Active Directory / L
 - search group members
 - add/remove members to/from AD groups using DN or sAMaccoutName
 - change AD passwords
+- check if a user is disabled or locked, group membership
+
+## Install
+
+```bash
+pip install msad
+```
 
 ## Usage
 
+I find useful to add an alias in my ~/.bash_aliases
+
+```bash
+alias msad='/usr/local/bin/msad --host=dmc448-01it.group.pirelli.com --port=636 --search_base dc=group,dc=pirelli,dc=com'
+```
+
+Retreive info about a user
+
+```bash
+msad check_user matteo 90 \[qliksense_analyzer,qliksense_professional\] 2>/dev/null
+{"is_disabled": false}
+{"is_locked": false}
+{"has_never_expires_password": false}
+{"has_expired_password": false}
+{"membership_qliksense_analyzer": false}
+{"membership_qliksense_professional": true}
 
 ## License
 
