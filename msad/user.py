@@ -66,15 +66,15 @@ def has_never_expires_password(conn, search_base, user):
 
 
 def has_expired_password(conn, search_base, user, max_age):
-    conn.search(
-        search_base,
-        f"(samaccountname={user})",
-        size_limit=1,
-        attributes=["pwdLastSet"],
+    #    return search(conn, search_base, search_filter, attributes=attributes)
+    search_filter = f"(samaccountname={user})"
+    result = search(
+        conn, search_base, search_filter, limit=1, attributes=["pwdLastSet"]
     )
-    if len(conn.entries) == 0:
+
+    if len(result) == 0:
         return None
-    result = conn.response[0]["attributes"]["pwdLastSet"]
+    result = result[0]["pwdLastSet"]
     logging.info(f"Password changed at {result}")
     now = datetime.datetime.now()
 
@@ -119,12 +119,7 @@ def user_groups(conn, search_base, limit, user_name=None, user_dn=None):
     if not user_dn:
         return None
 
-    filter = f"(member:1.2.840.113556.1.4.1941:={user_dn})"
-    conn.search(
-        search_base,
-        filter,
-        size_limit=limit,
-        attributes=["sAMAccountName"],
+    search_filter = f"(member:1.2.840.113556.1.4.1941:={user_dn})"
+    return search(
+        conn, search_base, search_filter, limit_limit, attributes=["sAMaccountName"]
     )
-    result = conn.entries
-    return result

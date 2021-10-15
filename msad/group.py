@@ -24,9 +24,17 @@ def add_member(
 ):
     if group_name:
         group_dn = get_dn(conn, search_base, group_name)
+    if not group_dn:
+        logging.error("Missing group DN")
+        return None
+
     if user_name:
         user_dn = get_dn(conn, search_base, user_name)
-    return conn.extend.microsoft.add_members_to_groups(user_dn, group_dn)
+    if not user_dn:
+        logging.error("Missing user DN")
+        return None
+
+    return conn.extend.microsoft.add_members_to_groups([user_dn], [group_dn])
 
 
 def remove_member(
@@ -43,10 +51,12 @@ def remove_member(
     if not user_dn:
         return None
 
-    return conn.extend.microsoft.remove_members_to_groups(user_dn, group_dn)
+    return conn.extend.microsoft.remove_members_from_groups([user_dn], [group_dn])
 
 
-def group_flat_members(conn, search_base, limit, group_name=None, group_dn=None):
+def group_flat_members(
+    conn, search_base, limit, group_name=None, group_dn=None, attributes=None
+):
     if group_name:
         group_dn = get_dn(conn, search_base, group_name)
 
@@ -54,14 +64,7 @@ def group_flat_members(conn, search_base, limit, group_name=None, group_dn=None)
         return None
 
     filter = f"(&(objectClass=person)(sAMAccountName=*)(memberOf:1.2.840.113556.1.4.1941:={group_dn}))"
-    conn.search(
-        search_base,
-        filter,
-        size_limit=limit,
-        attributes=["distinguishedname"],
-    )
-    result = conn.response
-    return result
+    return search(conn, search_base, search_filter, attributes=attributes)
 
 
 def group_members(conn, search_base, group_name=None, group_dn=None):
@@ -70,15 +73,8 @@ def group_members(conn, search_base, group_name=None, group_dn=None):
     if not group_dn:
         return None
 
-    filter = f"(distinguishedName={group_dn})"
-    conn.search(
-        group_dn,
-        filter,
-        size_limit=1,
-        attributes=["member"],
-    )
-    result = conn.response
-    return result
+    search_filter = f"(distinguishedName={group_dn})"
+    return search(conn, group_dn, search_filter, limit=1, attributes=["member"])
 
 
 def group_member(
@@ -94,8 +90,6 @@ def group_member(
     if not user_dn:
         return None
 
-    filter = f"(&(memberOf:1.2.840.113556.1.4.1941:={group_dn})(objectCategory=person)(objectClass=user)(distinguishedName={user_dn}))"
-    conn.search(search_base, filter, size_limit=1, attributes=None)
-    result = conn.entries
-    logging.debug(result)
+    search_filter = f"(&(memberOf:1.2.840.113556.1.4.1941:={group_dn})(objectCategory=person)(objectClass=user)(distinguishedName={user_dn}))"
+    result = search(conn, search_base, search_filter)
     return True if len(result) == 1 else False

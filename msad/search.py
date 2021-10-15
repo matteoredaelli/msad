@@ -19,22 +19,26 @@ import logging
 import ldap3
 
 
-def users(conn, search_base, string, attributes=None):
+def search(conn, search_base, search_filter, limit=0, attributes=None):
+    conn.search(search_base, search_filter, size_limit=limit, attributes=attributes)
+    result = conn.response
+    result = list(filter(lambda r: "dn" in r.keys(), result))
+    result = list(map(lambda r: r["attributes"], result))
+    logging.debug(result)
+    return result
+
+
+def users(conn, search_base, string, limit, attributes=None):
     """Search users inside AD
     filter: is the cn or userPrincipalName or samaccoutnname or mail to be searched. Can contain *
     """
     search_filter = f"(&(objectclass=user)(|(samaccountname={string})(mail={string})(cn={string})(userPrincipalName={string})))"
-    conn.search(search_base, search_filter, attributes=attributes)
-    result = conn.entries
-    return result
+    return search(conn, search_base, search_filter, limit=limit, attributes=attributes)
 
 
 def get_dn(conn, search_base, sAMAccountName):
     search_filter = f"(sAMAccountName={sAMAccountName})"
-
-    conn.search(search_base, search_filter, attributes=["distinguishedName"])
-    result = conn.entries
-    logging.debug(result)
+    result = search(conn, search_base, search_filter, attributes=["distinguishedName"])
     if len(result) < 1:
         return None
     return result[0]["distinguishedName"]
@@ -45,18 +49,13 @@ def get_dn(conn, search_base, sAMAccountName):
 def never_expires_password(conn, search_base, filter, limit=0, attributes=None):
     ## (userAccountControl:1.2.840.113556.1.4.803:=2)
     search_filter = f"(&(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=65536){filter})"
-    conn.search(search_base, search_filter, size_limit=limit, attributes=attributes)
-    result = conn.entries
-    return result
+    return search(conn, search_base, search_filter, limit=limit, attributes=attributes)
 
 
-##
 def disabled_users(conn, search_base, filter, limit=0, attributes=None):
     ## (userAccountControl:1.2.840.113556.1.4.803:=2)
     search_filter = f"(&(objectCategory=Person)(objectClass=User){filter}(userAccountControl:1.2.840.113556.1.4.803:=2))"
-    conn.search(search_base, search_filter, size_limit=limit, attributes=attributes)
-    result = conn.entries
-    return result
+    return search(conn, search_base, search_filter, limit=limit, attributes=attributes)
 
 
 def locked_users(conn, search_base, filter, limit=0, attributes=None):
@@ -64,6 +63,4 @@ def locked_users(conn, search_base, filter, limit=0, attributes=None):
     search_filter = (
         f"(&(objectCategory=Person)(objectClass=User){filter}(lockoutTime>=1))"
     )
-    conn.search(search_base, search_filter, size_limit=limit, attributes=attributes)
-    result = conn.entries
-    return result
+    return search(conn, search_base, search_filter, attributes=attributes)
