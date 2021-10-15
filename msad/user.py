@@ -110,7 +110,7 @@ def check_user(conn, search_base, user, max_age, groups=[]):
         )
 
 
-    def user_groups(conn, search_base, limit, user_name=None, user_dn=None):
+def user_groups(conn, search_base, limit, user_name=None, user_dn=None):
     """retrieve all groups (also nested) of a user"""
 
     if user_name:
