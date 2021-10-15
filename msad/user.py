@@ -108,3 +108,23 @@ def check_user(conn, search_base, user, max_age, groups=[]):
                 )
             }
         )
+
+
+    def user_groups(conn, search_base, limit, user_name=None, user_dn=None):
+    """retrieve all groups (also nested) of a user"""
+
+    if user_name:
+        user_dn = get_dn(conn, search_base, user_name)
+
+    if not user_dn:
+        return None
+
+    filter = f"(member:1.2.840.113556.1.4.1941:={user_dn})"
+    conn.search(
+        search_base,
+        filter,
+        size_limit=limit,
+        attributes=["sAMAccountName"],
+    )
+    result = conn.entries
+    return result

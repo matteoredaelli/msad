@@ -164,6 +164,11 @@ class AD:
             user_dn=user_dn,
         )
 
+    def user_groups(self, user_name=None, user_dn=None):
+        return msad.user.user_groups(
+            self._conn, self._search_base, self._limit, user_name, user_dn
+        )
+
     def remove_member(
         self, group_name=None, group_dn=None, user_name=None, user_dn=None
     ):
