@@ -89,7 +89,11 @@ class AD:
         out_format="json",
         sep=";",
     ):
-        self._conn = _get_connection(host, port, use_ssl, sso, user, password)
+        try:
+            self._conn = _get_connection(host, port, use_ssl, sso, user, password)
+        except:
+            logging.error("Cannot loging to Active Directory. Bye")
+            sys.exit(1)
         self._attributes = attributes
         self._sep = sep
         self._search_base = search_base

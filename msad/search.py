@@ -20,6 +20,9 @@ import ldap3
 
 
 def search(conn, search_base, search_filter, limit=0, attributes=None):
+    if not attributes:
+        attributes = ldap3.ALL_ATTRIBUTES
+
     conn.search(search_base, search_filter, size_limit=limit, attributes=attributes)
     result = conn.response
     result = list(filter(lambda r: "dn" in r.keys(), result))
