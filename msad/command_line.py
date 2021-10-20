@@ -100,6 +100,11 @@ class AD:
         self._limit = limit
         self._out_format = out_format
 
+    def change_password(self, user_name=None, user_dn=None):
+        return msad.user.change_password(
+            self._conn, self._search_base, user_name, user_dn
+        )
+
     def search(self, search_filter):
         self._conn.search(
             self._search_base,

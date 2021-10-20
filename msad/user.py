@@ -33,14 +33,18 @@ def _enter_password(text):
         return p
 
 
-def change_password(conn):
-    conn = _get_connection(args)
-    user = users(args)
+def change_password(conn, search_base, user_name=None, user_dn=None):
+    if user_name:
+        user_dn = get_dn(conn, search_base, user_name)
+
+    if not user_dn:
+        return None
+
     oldpwd = _enter_password("Old password: ")
     newpwd = _enter_password("New password : ")
     newpwd2 = _enter_password("New password (check): ")
     if newpwd == newpwd2:
-        conn.extend.microsoft.modify_password(user, newpwd, oldpwd)
+        conn.extend.microsoft.modify_password(user_dn, newpwd, oldpwd)
 
 
 def is_disabled(conn, search_base, user):
