@@ -19,7 +19,7 @@ pip install msad
 I find useful to add an alias in my ~/.bash_aliases
 
 ```bash
-alias msad='/usr/local/bin/msad --host=dmc448-01it.group.pirelli.com --port=636 --search_base dc=group,dc=pirelli,dc=com'
+alias msad='/usr/local/bin/msad --host=dmc1it.group.redaelli.org --port=636 --search_base dc=group,dc=redaelli,dc=org'
 ```
 
 Retreive info about a user
