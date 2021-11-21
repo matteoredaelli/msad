@@ -17,6 +17,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 
 import logging
+import os
 import datetime
 import sys
 import msad
@@ -215,7 +216,7 @@ BANNER = """
 
 def main():
     """main"""
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
     fire.Fire(AD)
 
 
