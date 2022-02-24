@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import logging
 from .search import *
 
 
@@ -25,13 +26,13 @@ def add_member(
     if group_name:
         group_dn = get_dn(conn, search_base, group_name)
     if not group_dn:
-        logging.error("Missing group DN")
+        logging.error("group_name or group_dn must be passed and exist")
         return None
 
     if user_name:
         user_dn = get_dn(conn, search_base, user_name)
     if not user_dn:
-        logging.error("Missing user DN")
+        logging.error("user_name or user_dn must be passed and exist")
         return None
 
     return conn.extend.microsoft.add_members_to_groups([user_dn], [group_dn])
@@ -44,11 +45,13 @@ def remove_member(
         group_dn = get_dn(conn, search_base, group_name)
 
     if not group_dn:
+        logging.error("group_name or group_dn must be passed and exist")
         return None
     if user_name:
         user_dn = get_dn(conn, search_base, user_name)
 
     if not user_dn:
+        logging.error("user_name or user_dn must be passed and exist")
         return None
 
     return conn.extend.microsoft.remove_members_from_groups([user_dn], [group_dn])
@@ -71,6 +74,7 @@ def group_members(conn, search_base, group_name=None, group_dn=None):
     if group_name:
         group_dn = get_dn(conn, search_base, group_name)
     if not group_dn:
+        logging.error("group_name or group_dn must be passed and exist")
         return None
 
     search_filter = f"(distinguishedName={group_dn})"
@@ -83,11 +87,13 @@ def group_member(
     if group_name:
         group_dn = get_dn(conn, search_base, group_name)
     if not group_dn:
+        logging.error("group_name or group_dn must be passed and exist")
         return None
 
     if user_name:
         user_dn = get_dn(conn, search_base, user_name)
     if not user_dn:
+        logging.error("user_name or user_dn must be passed and exist")
         return None
 
     search_filter = f"(&(memberOf:1.2.840.113556.1.4.1941:={group_dn})(objectCategory=person)(objectClass=user)(distinguishedName={user_dn}))"

@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import logging
 import getpass
 import ldap3
 import datetime
@@ -27,7 +28,7 @@ def _enter_password(text):
     try:
         p = getpass.getpass(text)
     except Exception as error:
-        print("ERROR", error)
+        logging.error(error)
         return None
     else:
         return p
@@ -52,21 +53,21 @@ def is_disabled(conn, search_base, user):
         conn, search_base, f"(samaccountname={user})", limit=1, attributes=None
     )
     logging.debug(result)
-    return True if len(result) == 1 else False
+    return True if len(result) == 1 else None
 
 
 def is_locked(conn, search_base, user):
     result = locked_users(
         conn, search_base, f"(samaccountname={user})", limit=1, attributes=None
     )
-    return True if len(result) == 1 else False
+    return True if len(result) == 1 else None
 
 
 def has_never_expires_password(conn, search_base, user):
     result = never_expires_password(
         conn, search_base, f"(samaccountname={user})", limit=1, attributes=None
     )
-    return True if len(result) == 1 else False
+    return True if len(result) == 1 else None
 
 
 def password_changed_in_days(conn, search_base, user):
@@ -148,5 +149,5 @@ def user_groups(conn, search_base, limit, user_name=None, user_dn=None):
 
     search_filter = f"(member:1.2.840.113556.1.4.1941:={user_dn})"
     return search(
-        conn, search_base, search_filter, limit_limit, attributes=["sAMaccountName"]
+        conn, search_base, search_filter, limit=limit, attributes=["sAMaccountName"]
     )

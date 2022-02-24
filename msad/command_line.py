@@ -26,7 +26,7 @@ import ldap3
 import ssl
 import json
 from typing import List, Tuple, Dict
-
+import pprint
 
 def _json_converter(o):
     if isinstance(o, datetime.datetime):
@@ -116,17 +116,21 @@ class AD:
         return self.pprint(self._conn.response)
 
     def pprint(self, ldapresult):
+        result = ""
+        if not ldapresult:
+            logging.warning("Empty ldap object: cannot pprint it")
+            return
         for obj in ldapresult:
-            if "attributes" in obj:
-                if self._out_format == "json":
-                    print(json.dumps(dict(obj["attributes"]), default=_json_converter))
-                elif self._out_format == "csv":
-                    print(self._sep.join(obj["attributes"].values()))
-                else:
-                    pprint.pprint(obj["attributes"])
-            # else:
-            #    print(obj["dn"])
-
+            if self._out_format == "json":
+                result +=  json.dumps(dict(obj), default=_json_converter) + "\n"
+            elif self._out_format == "csv":
+                result += self._sep.join(obj.values())
+            else:
+                pprint.pprint(obj)
+            #else:
+            #    result= result + obj
+        return result
+        
     def users(self, user):
         """Search users inside AD
         filter: is the cn or userPrincipalName or samaccoutnname or mail to be searched. Can contain *
@@ -137,34 +141,45 @@ class AD:
         return self.pprint(result)
 
     def is_disabled(self, user):
+        """Check if a user is disabled
+        """
         return msad.user.is_disabled(self._conn, self._search_base, user)
 
     def is_locked(self, user):
+        """Locked user?
+        """
         return msad.user.is_locked(self._conn, self._search_base, user)
 
     def has_expired_password(self, user, max_age):
-        """Search users inside AD"""
+        """user with expired password?"""
         return msad.has_expired_password(self._conn, self._search_base, user, max_age)
 
     def has_never_expires_password(self, user):
-        """Search users inside AD"""
+        """user with never exires password?"""
         return msad.has_never_expires_password(self._conn, self._search_base, user)
 
     def check_user(self, user, max_age, groups=[]):
-        """Search users inside AD"""
+        """Get info about a user"""
         return msad.check_user(self._conn, self._search_base, user, max_age, groups)
 
     def group_flat_members(self, search_base, group_name=None, group_dn=None):
         result = msad.group_flat_members(
             self._conn, search_base, self._limit, group_name, group_dn
         )
-        return self.pprint(result)
+        return result ## self.pprint(result)
 
     def group_members(self, group_name=None, group_dn=None):
+        """Get members od a group
+        """
+        if group_name is None and group_dn is None:
+            logging.error("group_name or group_dn must be entered")
+            return None
         result = msad.group_members(self._conn, self._search_base, group_name, group_dn)
         return self.pprint(result)
 
     def add_member(self, group_name=None, group_dn=None, user_name=None, user_dn=None):
+        """Adding a user to a group
+        """
         return msad.add_member(
             conn=self._conn,
             search_base=self._search_base,
@@ -175,6 +190,8 @@ class AD:
         )
 
     def user_groups(self, user_name=None, user_dn=None):
+        """groups of a user
+        """
         return msad.user.user_groups(
             self._conn, self._search_base, self._limit, user_name, user_dn
         )
@@ -182,6 +199,8 @@ class AD:
     def remove_member(
         self, group_name=None, group_dn=None, user_name=None, user_dn=None
     ):
+        """Remove a user from a group
+        """
         return msad.remove_member(
             conn=self._conn,
             search_base=self._search_base,
@@ -192,8 +211,9 @@ class AD:
         )
 
     def group_member(
-        self, group_name=None, group_dn=None, user_name=None, user_dn=None
-    ):
+        self, group_name=None, group_dn=None, user_name=None, user_dn=None):
+        """ group membership
+        """
         return msad.group_member(
             conn=self._conn,
             search_base=self._search_base,
