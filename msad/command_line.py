@@ -131,7 +131,13 @@ class AD:
                         result + json.dumps(dict(obj), default=_json_converter) + "\n"
                     )
                 elif self._out_format == "csv":
-                    result = result + self._sep.join(obj.values()) + "\n"
+                    new_values = list(
+                        map(
+                            lambda v: "|".join(v) if isinstance(v, list) else v,
+                            obj.values(),
+                        )
+                    )
+                    result = result + self._sep.join(new_values) + "\n"
             return result
 
     def users(self, user):
