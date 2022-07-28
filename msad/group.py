@@ -66,7 +66,7 @@ def group_flat_members(
     if not group_dn:
         return None
 
-    filter = f"(&(objectClass=person)(sAMAccountName=*)(memberOf:1.2.840.113556.1.4.1941:={group_dn}))"
+    search_filter = f"(&(objectClass=person)(sAMAccountName=*)(memberOf:1.2.840.113556.1.4.1941:={group_dn}))"
     return search(conn, search_base, search_filter, attributes=attributes)
 
 
