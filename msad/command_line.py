@@ -169,11 +169,16 @@ class AD:
         """Get info about a user"""
         return msad.check_user(self._conn, self._search_base, user, max_age, groups)
 
-    def group_flat_members(self, search_base, group_name=None, group_dn=None):
+    def group_flat_members(self, group_name=None, group_dn=None):
         result = msad.group_flat_members(
-            self._conn, search_base, self._limit, group_name, group_dn
+            self._conn,
+            self._search_base,
+            self._limit,
+            group_name,
+            group_dn,
+            attributes=self._attributes,
         )
-        return result  ## self.pprint(result)
+        return self.pprint(result)
 
     def group_members(self, group_name=None, group_dn=None):
         """Get members od a group"""
