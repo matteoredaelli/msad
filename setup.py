@@ -20,7 +20,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="msad",
-    version="0.1.5",
+    version="0.2.0",
     author="Matteo Redaelli",
     author_email="matteo.redaelli@gmail.com",
     description="msad is a library and commandline for interacting with Active Directory",

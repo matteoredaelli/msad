@@ -131,10 +131,11 @@ class AD:
                         result + json.dumps(dict(obj), default=_json_converter) + "\n"
                     )
                 elif self._out_format == "csv":
+                    sorted_obj = dict(sorted(obj.items()))
                     new_values = list(
                         map(
                             lambda v: "|".join(v) if isinstance(v, list) else v,
-                            obj.values(),
+                            sorted_obj.values(),
                         )
                     )
                     result = result + self._sep.join(new_values) + "\n"

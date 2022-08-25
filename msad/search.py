@@ -19,12 +19,26 @@ import logging
 import ldap3
 
 
-def search(conn, search_base, search_filter, limit=0, attributes=None):
+def search_old(conn, search_base, search_filter, limit=0, attributes=None):
     if not attributes:
         attributes = ldap3.ALL_ATTRIBUTES
 
     conn.search(search_base, search_filter, size_limit=limit, attributes=attributes)
     result = conn.response
+    result = list(filter(lambda r: "dn" in r.keys(), result))
+    result = list(map(lambda r: r["attributes"], result))
+    logging.debug(result)
+    return result
+
+
+def search(conn, search_base, search_filter, limit=0, attributes=None):
+    if not attributes:
+        attributes = ldap3.ALL_ATTRIBUTES
+
+    resultgenerator = conn.extend.standard.paged_search(
+        search_base, search_filter, size_limit=limit, attributes=attributes
+    )
+    result = list(resultgenerator)
     result = list(filter(lambda r: "dn" in r.keys(), result))
     result = list(map(lambda r: r["attributes"], result))
     logging.debug(result)
@@ -42,8 +56,10 @@ def users(conn, search_base, string, limit, attributes=None):
 def get_dn(conn, search_base, sAMAccountName):
     search_filter = f"(sAMAccountName={sAMAccountName})"
     result = search(conn, search_base, search_filter, attributes=["distinguishedName"])
+    logging.debug(result)
     if len(result) < 1:
         return None
+
     return result[0]["distinguishedName"]
 
 
