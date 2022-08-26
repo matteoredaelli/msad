@@ -37,6 +37,13 @@ msad check_user matteo 90 \[qliksense_analyzer,qliksense_professional\] 2>/dev/n
 {"membership_qliksense_professional": true}
 ```
 
+Getting nested group members (it is a pages search, it can retreive more than 1000 users)
+
+```bash
+msad --out_format csv --attributes samaccountname,mail,sn,givenName group_flat_members "dc=group,dc=redaelli,dc=org" --group_name "qliksense_admin"
+```
+
+
 ## License
 
 Copyright © 2021 Matteo Redaelli

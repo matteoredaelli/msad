@@ -116,9 +116,9 @@ class AD:
         )
         result = list(filter(lambda e: "attributes" in e, self._conn.response))
         result = list(map(lambda e: e["attributes"], result))
-        return self.pprint(result)
+        return self._pprint(result)
 
-    def pprint(self, ldapresult):
+    def _pprint(self, ldapresult):
         if not ldapresult or self._out_format == "default":
             return ldapresult
         elif self._out_format == "json1":
@@ -142,35 +142,36 @@ class AD:
             return result
 
     def users(self, user):
-        """Search users inside AD
-        filter: is the cn or userPrincipalName or samaccoutnname or mail to be searched. Can contain *
+        """Find users inside AD. The
+        filter can be the cn or userPrincipalName or samaccoutnname or mail to be searched. Can contain *
         """
         result = msad.users(
             self._conn, self._search_base, user, attributes=self._attributes
         )
-        return self.pprint(result)
+        return self._pprint(result)
 
     def is_disabled(self, user):
         """Check if a user is disabled"""
         return msad.user.is_disabled(self._conn, self._search_base, user)
 
     def is_locked(self, user):
-        """Locked user?"""
+        """Check if the user is locked"""
         return msad.user.is_locked(self._conn, self._search_base, user)
 
     def has_expired_password(self, user, max_age):
-        """user with expired password?"""
+        """Check is user has the expired password"""
         return msad.has_expired_password(self._conn, self._search_base, user, max_age)
 
     def has_never_expires_password(self, user):
-        """user with never exires password?"""
+        """Check if a user has never expires password"""
         return msad.has_never_expires_password(self._conn, self._search_base, user)
 
     def check_user(self, user, max_age, groups=[]):
-        """Get info about a user"""
+        """Get some info about a user: is it locked? disabled? password expired?"""
         return msad.check_user(self._conn, self._search_base, user, max_age, groups)
 
     def group_flat_members(self, group_name=None, group_dn=None):
+        """Extract all the (nested) members of a group"""
         result = msad.group_flat_members(
             self._conn,
             self._search_base,
@@ -179,18 +180,18 @@ class AD:
             group_dn,
             attributes=self._attributes,
         )
-        return self.pprint(result)
+        return self._pprint(result)
 
     def group_members(self, group_name=None, group_dn=None):
-        """Get members od a group"""
+        """Extract the direct members of a group"""
         if group_name is None and group_dn is None:
             logging.error("group_name or group_dn must be entered")
             return None
         result = msad.group_members(self._conn, self._search_base, group_name, group_dn)
-        return self.pprint(result)
+        return self._pprint(result)
 
     def add_member(self, group_name=None, group_dn=None, user_name=None, user_dn=None):
-        """Adding a user to a group"""
+        """Adds the user to a group (using DN or sAMAccountName)"""
         return msad.add_member(
             conn=self._conn,
             search_base=self._search_base,
@@ -201,7 +202,7 @@ class AD:
         )
 
     def user_groups(self, user_name=None, user_dn=None):
-        """groups of a user"""
+        """Extract the list of groups of a user (using DN or sAMAccountName)"""
         return msad.user.user_groups(
             self._conn, self._search_base, self._limit, user_name, user_dn
         )
@@ -209,7 +210,7 @@ class AD:
     def remove_member(
         self, group_name=None, group_dn=None, user_name=None, user_dn=None
     ):
-        """Remove a user from a group"""
+        """Remove the user from a group (using DN or sAMAccountName)"""
         return msad.remove_member(
             conn=self._conn,
             search_base=self._search_base,
@@ -222,7 +223,7 @@ class AD:
     def group_member(
         self, group_name=None, group_dn=None, user_name=None, user_dn=None
     ):
-        """group membership"""
+        """Check if the user is a member of a group (using DN or sAMAccountName)"""
         return msad.group_member(
             conn=self._conn,
             search_base=self._search_base,
@@ -234,18 +235,19 @@ class AD:
 
 
 BANNER = """
-    _    ____
-   / \  |  _ \
-  / _ \ | | | |
- / ___ \| |_| |
-/_/   \_\____/
-
+ __  __  ____     _     ____  
+|  \/  |/ ___|   / \   |  _ \ 
+| |\/| |\___ \  / _ \  | | | |
+| |  | | ___) |/ ___ \ | |_| |
+|_|  |_||____//_/   \_\|____/ 
+                              
 """
 
 
 def main():
     """main"""
     logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
+    logging.info(BANNER)
     fire.Fire(AD)
 
 
