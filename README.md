@@ -16,6 +16,57 @@ pip install msad
 
 ## Usage
 
+```bash
+msad --help
+```
+
+```text
+ COMMAND is one of the following:
+
+     add_member
+       Adds the user to a group (using DN or sAMAccountName)
+
+     change_password
+
+     check_user
+       Get some info about a user: is it locked? disabled? password expired?
+
+     group_flat_members
+       Extract all the (nested) members of a group
+
+     group_member
+       Check if the user is a member of a group (using DN or sAMAccountName)
+
+     group_members
+       Extract the direct members of a group
+
+     has_expired_password
+       Check is user has the expired password
+
+     has_never_expires_password
+       Check if a user has never expires password
+
+     is_disabled
+       Check if a user is disabled
+
+     is_locked
+       Check if the user is locked
+
+     remove_member
+       Remove the user from a group (using DN or sAMAccountName)
+
+     search
+
+     user_groups
+       Extract the list of groups of a user (using DN or sAMAccountName)
+
+     users
+       Find users inside AD. The filter can be the cn or userPrincipalName or samaccoutnname or mail to be searched. Can contain *
+
+```
+
+## Sample
+
 I find useful to add an alias in my ~/.bash_aliases
 
 ```bash
