@@ -241,6 +241,10 @@ BANNER = """
 | |  | | ___) |/ ___ \ | |_| |
 |_|  |_||____//_/   \_\|____/ 
                               
+https://github.com/matteoredaelli/msad
+
+https://pypi.org/project/msad/
+
 """
 
 

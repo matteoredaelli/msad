@@ -97,7 +97,7 @@ msad --out_format csv --attributes samaccountname,mail,sn,givenName group_flat_m
 
 ## License
 
-Copyright © 2021 Matteo Redaelli
+Copyright © 2021 2022 Matteo Redaelli
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
