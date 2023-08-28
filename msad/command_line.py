@@ -75,7 +75,8 @@ class AD:
     add/remove members to/from groups,
     change password
     check if a user is locked, disabled
-    check if a user's password is expired"""
+    check if a user's password is expired
+    ..."""
 
     def __init__(
         self,
@@ -94,7 +95,9 @@ class AD:
         try:
             self._conn = _get_connection(host, port, use_ssl, sso, user, password)
         except:
-            logging.error("Cannot loging to Active Directory. Bye")
+            logging.error(
+                f"Cannot login to Active Directory (host: {host}, port: {port}). Bye"
+            )
             sys.exit(1)
         self._attributes = attributes
         self._sep = sep
@@ -158,6 +161,9 @@ class AD:
         """Check if the user is locked"""
         return msad.user.is_locked(self._conn, self._search_base, user)
 
+    def password_changed_in_days(self, user):
+        return msad.user.password_changed_in_days(self._conn, self._search_base, user)
+    
     def has_expired_password(self, user, max_age):
         """Check is user has the expired password"""
         return msad.has_expired_password(self._conn, self._search_base, user, max_age)

@@ -8,11 +8,6 @@ msad is a library and command line tool for working with an Active Directory / L
 - change AD passwords
 - check if a user is disabled or locked, group membership
 
-## Install
-
-```bash
-pip install msad
-```
 
 ## Usage
 

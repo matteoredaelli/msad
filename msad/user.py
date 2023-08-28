@@ -70,24 +70,20 @@ def has_never_expires_password(conn, search_base, user):
     return True if len(result) == 1 else None
 
 
-def password_changed_in_days(conn, search_base, user):
+def password_changed_in_days(conn, search_base, user, limit=1000):
     search_filter = f"(samaccountname={user})"
     result = search(
-        conn, search_base, search_filter, limit=1, attributes=["pwdLastSet"]
+        conn, search_base, search_filter, limit=limit, attributes=["sAMAccountName","pwdLastSet"]
     )
 
     if len(result) == 0:
         return None
-    result = result[0]["pwdLastSet"]
-    logging.info(f"Password changed at {result}")
-    now = datetime.datetime.now()
 
-    if result == 0:
-        return True
-    else:
-        delta = now - result.replace(tzinfo=None)
-        days = delta.days
-        return days
+    now = datetime.datetime.now()
+    result = [ {"sAMAccountName": u["sAMAccountName"],
+                "days": (now - u["pwdLastSet"].replace(tzinfo=None)).days} for u in result]
+
+    return result
 
 
 def has_expired_password(conn, search_base, user, max_age):
