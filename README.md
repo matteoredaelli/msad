@@ -5,8 +5,8 @@
 It supports authentication with user/pwd and kerberos
 
 It can be used for:
-- search objects (users, groups, computers,..)
-- search group members
+- search objects (users, groups, computers,..) using pagination (it can retreive > 2000 resukts)
+- search (recursively) group members
 - add/remove members to/from AD groups using DN or sAMaccoutName
 - change AD passwords
 - check if a user is disabled or locked, group membership
@@ -59,6 +59,7 @@ msad search "(samaccountname=matteo)"  --out-format=json
 
 msad search "(cn=redaelli*)" --attribute mail --attribute samaccountname --out-format=json
 
+msad group-members qlik_analyzer_users --nested
 ```
 
 ## Sample

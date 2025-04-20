@@ -20,7 +20,7 @@ import logging
 import getpass
 import ldap3
 import datetime
-from .search import *
+from .search import get_dn, search
 from .group import *
 
 
@@ -34,9 +34,8 @@ def _enter_password(text):
         return p
 
 
-def change_password(conn, search_base, user_name=None, user_dn=None):
-    if user_name:
-        user_dn = get_dn(conn, search_base, user_name)
+def change_password(conn, search_base, user):
+    user_dn = get_dn(conn, search_base, user)
 
     if not user_dn:
         return None
@@ -134,11 +133,10 @@ def check_user(conn, search_base, user, max_age, groups=[]):
         )
 
 
-def user_groups(conn, search_base, limit, user_name=None, user_dn=None):
+def user_groups(conn, search_base, limit, user):
     """retrieve all groups (also nested) of a user"""
 
-    if user_name:
-        user_dn = get_dn(conn, search_base, user_name)
+    user_dn = get_dn(conn, search_base, user)
 
     if not user_dn:
         return None

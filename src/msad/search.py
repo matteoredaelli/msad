@@ -53,11 +53,14 @@ def users(conn, search_base, string, limit, attributes=None):
     return search(conn, search_base, search_filter, limit=limit, attributes=attributes)
 
 
-def get_dn(conn, search_base, sAMAccountName):
-    search_filter = f"(sAMAccountName={sAMAccountName})"
+def get_dn(conn, search_base, entry):
+    if entry.lower().startswith("cn="):
+        return entry
+    search_filter = f"(sAMAccountName={entry})"
     result = search(conn, search_base, search_filter, attributes=["distinguishedName"])
     logging.debug(result)
     if len(result) < 1:
+        logging.error(f"entry {entry} not found")
         return None
 
     return result[0]["distinguishedName"]

@@ -44,13 +44,13 @@ def _get_domain_config(config: dict|None, domain: str|None):
         logging.error(f"Missing entry 'defaults' in config file. Bye!")
         sys.exit(100)
     if "domain" not in config["defaults"]:
-        logging.error(f"Missing entry 'domain' in section 'defaults' in config file. Bye!")
+        logging.error("Missing entry 'domain' in section 'defaults' in config file. Bye!")
         sys.exit(101)
         
     default_domain = config["defaults"]["domain"]
     
     if "domains" not in config:
-        logging.error(f"Missing section 'domains' in config file. Bye!")
+        logging.error("Missing section 'domains' in config file. Bye!")
         sys.exit(102)
         
     if default_domain not in config["domains"] :
@@ -134,7 +134,7 @@ def _get_connection(config: dict):
     conn.bind()
     return conn
 
-def _pprint(ldapresult, out_format, sep="\t"):
+def _pprint(ldapresult, out_format="json", sep="\t"):
     if not ldapresult or out_format == "default":
         return ldapresult
     elif out_format == "json1":
@@ -189,36 +189,7 @@ def _pprint(ldapresult, out_format, sep="\t"):
     #     """Get some info about a user: is it locked? disabled? password expired?"""
     #     return msad.check_user(self._conn, self._search_base, user, max_age, groups)
 
-    # def group_flat_members(self, group_name=None, group_dn=None):
-    #     """Extract all the (nested) members of a group"""
-    #     result = msad.group_flat_members(
-    #         self._conn,
-    #         self._search_base,
-    #         self._limit,
-    #         group_name,
-    #         group_dn,
-    #         attributes=self._attributes,
-    #     )
-    #     return self._pprint(result)
 
-    # def group_members(self, group_name=None, group_dn=None):
-    #     """Extract the direct members of a group"""
-    #     if group_name is None and group_dn is None:
-    #         logging.error("group_name or group_dn must be entered")
-    #         return None
-    #     result = msad.group_members(self._conn, self._search_base, group_name, group_dn)
-    #     return self._pprint(result)
-
-    # def add_member(self, group_name=None, group_dn=None, user_name=None, user_dn=None):
-    #     """Adds the user to a group (using DN or sAMAccountName)"""
-    #     return msad.add_member(
-    #         conn=self._conn,
-    #         search_base=self._search_base,
-    #         group_name=group_name,
-    #         group_dn=group_dn,
-    #         user_name=user_name,
-    #         user_dn=user_dn,
-    #     )
 
     # def user_groups(self, user_name=None, user_dn=None):
     #     """Extract the list of groups of a user (using DN or sAMAccountName)"""
@@ -257,14 +228,82 @@ def _pprint(ldapresult, out_format, sep="\t"):
 app = typer.Typer()
 
 @app.command()
-def change_password(userid: str|None, userdn: str|None, domain: str|None, config_file: str|None):
+def change_password(user: str,
+                    domain: str|None = None,
+                    config_file: str|None = None):
     config = _get_config(config_file, domain)
     conn = _get_connection(config)
     return msad.user.change_password(
-            conn, config["search_base"], userid, userdn)
+        conn, config["search_base"], user)
 
 @app.command()
-def search(filter: str, limit: int = 2000, domain: str|None = None, config_file: str|None = None, out_format: str = "json", attributes: list[str] = []):
+def group_add_member(group: str,
+                     user: str,
+                     domain: str|None = None,
+                     config_file: str|None = None):
+    """Adds the user to a group (using DN or sAMAccountName)"""
+    
+    config = _get_config(config_file, domain)
+    conn = _get_connection(config)
+    result =  msad.add_member(
+        conn=conn,
+        search_base=config["search_base"],
+        group=group,
+        user=user,
+    )
+    return result
+
+@app.command()
+def group_remove_member(group: str,
+                     user: str,
+                     domain: str|None = None,
+                     config_file: str|None = None):
+    """Remove the user to a group (using DN or sAMAccountName)"""
+    
+    config = _get_config(config_file, domain)
+    conn = _get_connection(config)
+    result =  msad.remove_member(
+        conn=conn,
+        search_base=config["search_base"],
+        group=group,
+        user=user,
+    )
+    return result
+
+@app.command()
+def group_members(group: str,
+                  nested: bool=False,
+                  limit: int = 2000,
+                  domain: str|None = None,
+                  config_file: str|None = None,
+                  out_format: str = "json",
+                  attributes: list[str] = []):
+    
+    config = _get_config(config_file, domain)
+    conn = _get_connection(config)
+    if nested:
+        result = msad.group_flat_members(
+            conn,
+            config["search_base"],
+            limit,
+            group,
+            attributes=attributes,
+        )
+    else:
+        """Extract the direct members of a group"""
+        result = msad.group_members(
+            conn,
+            config["search_base"],
+            group)
+    print(_pprint(result))
+    
+@app.command()
+def search(filter: str,
+           limit: int = 2000,
+           domain: str|None = None,
+           config_file: str|None = None,
+           out_format: str = "json",
+           attributes: list[str] = []):
     config = _get_config(config_file, domain)
     conn = _get_connection(config)
     result = msad.search(conn, config["search_base"], filter, limit=limit, attributes=attributes)
