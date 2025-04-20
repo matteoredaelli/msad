@@ -133,7 +133,7 @@ def check_user(conn, search_base, user, max_age, groups=[]):
         )
 
 
-def user_groups(conn, search_base, limit, user):
+def user_groups(conn, search_base, limit, user, nested=True):
     """retrieve all groups (also nested) of a user"""
 
     user_dn = get_dn(conn, search_base, user)
@@ -141,7 +141,13 @@ def user_groups(conn, search_base, limit, user):
     if not user_dn:
         return None
 
-    search_filter = f"(member:1.2.840.113556.1.4.1941:={user_dn})"
+    if nested:
+        search_filter = f"(member:1.2.840.113556.1.4.1941:={user_dn})"
+        attributes = ["sAMaccountName"]
+    else:
+        search_filter = "(objectClass=*)"
+        search_base = user_dn
+        attributes = ["memberOf"]
     return search(
-        conn, search_base, search_filter, limit=limit, attributes=["sAMaccountName"]
+        conn, search_base, search_filter, limit=limit, attributes=attributes
     )

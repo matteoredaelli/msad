@@ -197,18 +197,6 @@ def _pprint(ldapresult, out_format="json", sep="\t"):
     #         self._conn, self._search_base, self._limit, user_name, user_dn
     #     )
 
-    # def remove_member(
-    #     self, group_name=None, group_dn=None, user_name=None, user_dn=None
-    # ):
-    #     """Remove the user from a group (using DN or sAMAccountName)"""
-    #     return msad.remove_member(
-    #         conn=self._conn,
-    #         search_base=self._search_base,
-    #         group_name=group_name,
-    #         group_dn=group_dn,
-    #         user_name=user_name,
-    #         user_dn=user_dn,
-    #     )
 
     # def group_member(
     #     self, group_name=None, group_dn=None, user_name=None, user_dn=None
@@ -332,6 +320,20 @@ use_ssl = true
 # password =
 """
     print(output)
+
+@app.command()
+def user_groups(user: str,
+                nested: bool=False,
+                limit: int = 2000,
+                domain: str|None = None,
+                config_file: str|None = None,
+                out_format: str = "json"):
     
+    config = _get_config(config_file, domain)
+    conn = _get_connection(config)
+
+    result = msad.user.user_groups(conn, config["search_base"], limit, user, nested=nested)
+    print(_pprint(result, out_format))
+
 if __name__ == "__main__":
     app()
