@@ -1,12 +1,12 @@
 [project]
 name = "msad"
-version = "0.4.0"
+version = "0.4.1"
 authors = [
   { name="Matteo Redaelli", email="matteo.redaelli@gmail.com" },
 ]
 description = "msad is a commandline for interacting with Active Directory"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 
 dependencies = [
     "ldap3",

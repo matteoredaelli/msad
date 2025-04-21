@@ -6,21 +6,22 @@ It supports authentication with user/pwd and kerberos
 
 It supports paginations: it can retreive more than 2000 objects (a limit of AD)
 
-It can be used for:
-- search objects (users, groups, computers,..)
-- search (recursively) group memberships and all user's groups
-- add/remove members to/from AD groups using DN or sAMaccoutName
-- change AD passwords
-- check if a user is disabled or locked, group membership
+Features:
+
+- [X] search objects (users, groups, computers,..)
+- [X] search (recursively) group memberships and all user's groups
+- [X] add/remove members to/from AD groups using DN or sAMaccoutName
+- [X] change AD passwords
+- [ ] check if a user is disabled or locked
 
 ## Prerequisites
 
-python >= 3.9
+python >= 3.11
 
 For kerboros auth
 
   - krb5 lib and tools (like kinit, ...)
-  - a keytab file or 
+  - a keytab file or krb5.conf configured 
   
 ## Installation
 
@@ -28,14 +29,13 @@ For kerboros auth
 pipx install msad
 ```
 
-## COnfiguration
+## Configuration
 
 Create a configuration file in $HOME/.msad.toml as suggested by
 
 ```bash
 msad get-sample-config
 ```
-
 
 ## Usage
 
@@ -47,19 +47,16 @@ python -m msad --help
 
 ```
 
-
 For kerberos authentication, first you need to login to AD / get a ticket kerberos with
 
 ```bash
-kinit youraduser
+kinit # or kinit myaduser 
 ```
 
-
-
 ```text
-msad search "(samaccountname=matteo)"  --out-format=json
+msad search "(samaccountname=matteo)"  --out-format=json # show all attributes
 
-msad search "(cn=redaelli*)" --attribute mail --attribute samaccountname --out-format=json
+msad search "(cn=redaelli*)" --attributes mail --attributes samaccountname --out-format=json
 
 msad group-members qlik_analyzer_users --nested
 
@@ -70,10 +67,6 @@ msad group-remove-member qlik_analyzer_users matteo
 msad user-groups matteo --nested
 
 ```
-
-## Sample
-
-
 
 ## License
 

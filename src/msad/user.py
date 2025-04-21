@@ -20,11 +20,11 @@ import logging
 import getpass
 import ldap3
 import datetime
-from .search import get_dn, search
-from .group import *
+from .search import disabled_users, get_dn, search, locked_users, never_expires_password
+from .group import group_member
 
 
-def _enter_password(text):
+def _enter_password(text: str):
     try:
         p = getpass.getpass(text)
     except Exception as error:
@@ -34,7 +34,7 @@ def _enter_password(text):
         return p
 
 
-def change_password(conn, search_base, user):
+def change_password(conn, search_base: str, user: str):
     user_dn = get_dn(conn, search_base, user)
 
     if not user_dn:
@@ -47,7 +47,7 @@ def change_password(conn, search_base, user):
         conn.extend.microsoft.modify_password(user_dn, newpwd, oldpwd)
 
 
-def is_disabled(conn, search_base, user):
+def is_disabled(conn, search_base: str, user: str):
     result = disabled_users(
         conn, search_base, f"(samaccountname={user})", limit=1, attributes=None
     )
@@ -55,37 +55,21 @@ def is_disabled(conn, search_base, user):
     return True if len(result) == 1 else None
 
 
-def is_locked(conn, search_base, user):
+def is_locked(conn, search_base: str, user: str):
     result = locked_users(
         conn, search_base, f"(samaccountname={user})", limit=1, attributes=None
     )
     return True if len(result) == 1 else None
 
 
-def has_never_expires_password(conn, search_base, user):
+def has_never_expires_password(conn, search_base: str, user: str):
     result = never_expires_password(
         conn, search_base, f"(samaccountname={user})", limit=1, attributes=None
     )
     return True if len(result) == 1 else None
 
 
-def password_changed_in_days(conn, search_base, user, limit=1000):
-    search_filter = f"(samaccountname={user})"
-    result = search(
-        conn, search_base, search_filter, limit=limit, attributes=["sAMAccountName","pwdLastSet"]
-    )
-
-    if len(result) == 0:
-        return None
-
-    now = datetime.datetime.now()
-    result = [ {"sAMAccountName": u["sAMAccountName"],
-                "days": (now - u["pwdLastSet"].replace(tzinfo=None)).days} for u in result]
-
-    return result
-
-
-def has_expired_password(conn, search_base, user, max_age):
+def password_changed_in_days(conn, search_base: str, user: str, limit: int = 2000, max_age: int):
     #    return search(conn, search_base, search_filter, attributes=attributes)
     search_filter = f"(samaccountname={user})"
     result = search(
@@ -106,7 +90,7 @@ def has_expired_password(conn, search_base, user, max_age):
         return True if days > max_age else False
 
 
-def check_user(conn, search_base, user, max_age, groups=[]):
+def check_user(conn, search_base:str, user:str, max_age:int, groups=[]):
     # result = {}
     yield ({"is_disabled": is_disabled(conn, search_base, user)})
     yield ({"is_locked": is_locked(conn, search_base, user)})
@@ -127,13 +111,13 @@ def check_user(conn, search_base, user, max_age, groups=[]):
         yield (
             {
                 f"membership_{group}": group_member(
-                    conn, search_base, group_name=group, user_name=user
+                    conn, search_base, group=group, user=user
                 )
             }
         )
 
 
-def user_groups(conn, search_base, limit, user, nested=True):
+def user_groups(conn, search_base:str , limit: int, user: str, nested: bool =True):
     """retrieve all groups (also nested) of a user"""
 
     user_dn = get_dn(conn, search_base, user)
