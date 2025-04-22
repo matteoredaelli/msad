@@ -9,10 +9,11 @@ readme = "README.md"
 requires-python = ">=3.11"
 
 dependencies = [
-    "ldap3",
-    "gssapi",
-    "cryptography",
-    "typer"
+    "click==8.1.8",
+    "cryptography==44.0.2",
+    "gssapi==1.9.0",
+    "ldap3==2.9.1",
+    "typer==0.15.2"
 ]
 
 classifiers = [
