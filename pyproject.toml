@@ -1,6 +1,6 @@
 [project]
 name = "msad"
-version = "0.4.1"
+version = "0.4.2"
 authors = [
   { name="Matteo Redaelli", email="matteo.redaelli@gmail.com" },
 ]

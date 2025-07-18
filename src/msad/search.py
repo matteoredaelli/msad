@@ -49,7 +49,7 @@ def users(conn, search_base, string, limit, attributes=None):
     """Search users inside AD
     filter: is the cn or userPrincipalName or samaccoutnname or mail to be searched. Can contain *
     """
-    search_filter = f"(&(objectclass=user)(|(samaccountname={string})(mail={string})(cn={string})(userPrincipalName={string})))"
+    search_filter = f"(&(objectclass=user)(|(samaccountname={string})(mail={string})(cn={string}*)(userPrincipalName={string}*)))"
     return search(conn, search_base, search_filter, limit=limit, attributes=attributes)
 
 
