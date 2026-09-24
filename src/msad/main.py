@@ -27,13 +27,14 @@ import os
 import ssl
 from collections.abc import Callable
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 
 import ldap3
 import typer
 
 import msad
-from msad.config import DomainConfig, load_domain_config
+from msad.config import DEFAULT_CONFIG_PATH, SAMPLE_CONFIG, DomainConfig, load_domain_config
 from msad.exceptions import MsadError
 from msad.types import LdapEntries
 
@@ -372,29 +373,30 @@ def check_user(
 
 
 @app.command()
-def get_sample_config():
-    """Print a sample configuration file."""
-    output = """
-[defaults]
+@_handle_errors
+def init(config_file: str | None = None, force: bool = False):
+    """Create a sample config file in the user's home (~/.msad.toml).
 
-domain = "mydomain"
+    Does nothing (with a warning) if the file already exists, unless --force
+    is given. Use --config-file to write to a different path.
+    """
+    path = Path(config_file) if config_file else DEFAULT_CONFIG_PATH
 
-[domains]
+    if path.exists() and not force:
+        logging.warning("Config file already exists, not overwriting: %s", path)
+        logging.warning("Use --force to overwrite it.")
+        return
 
-[domains.mydomain]
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(SAMPLE_CONFIG, encoding="utf-8")
+    except OSError as exc:
+        logging.error("Could not write config file %s: %s", path, exc)
+        raise typer.Exit(code=1) from exc
 
-host = "example.com"
-search_base = "dc=example,dc=com"
-
-port = 636
-use_ssl = true
-#port = 389
-#use_ssl = false
-
-# user =
-# password =
-"""
-    print(output)
+    action = "Overwrote" if force else "Created"
+    print(f"{action} sample config: {path}")
+    print("Edit it to set your domain(s), then run e.g. `msad user-get <name>`.")
 
 
 if __name__ == "__main__":

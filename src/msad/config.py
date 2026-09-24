@@ -74,6 +74,37 @@ class MsadConfig(BaseModel):
 
 DEFAULT_CONFIG_PATH = Path.home() / ".msad.toml"
 
+# A ready-to-edit sample configuration. Kept next to the models above so it
+# stays in sync with them; a test parses it through load_config to guarantee
+# it is always valid TOML matching the current schema.
+SAMPLE_CONFIG = """\
+# msad configuration file (default location: ~/.msad.toml)
+
+[defaults]
+# Domain used when --domain is not passed on the command line.
+domain = "mydomain"
+
+[domains.mydomain]
+host = "dc.example.com"
+search_base = "dc=example,dc=com"
+
+# LDAPS (recommended). For plain LDAP use port 389 and use_ssl = false.
+port = 636
+use_ssl = true
+
+# Authentication:
+#   - Omit both user and password to authenticate with Kerberos (SASL).
+#     Get a ticket first with: kinit
+#   - Set BOTH to authenticate with user/password:
+# user = "svc_account"
+# password = "s3cr3t"
+
+# You can declare more domains and select one with --domain <name>:
+# [domains.otherdomain]
+# host = "dc.other.example.com"
+# search_base = "dc=other,dc=example,dc=com"
+"""
+
 
 def load_config(config_file: str | Path | None = None) -> MsadConfig:
     """Load and validate the msad configuration file.

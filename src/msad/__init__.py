@@ -22,6 +22,7 @@ except ImportError:  # pragma: no cover - only when running from an unbuilt tree
 
 from .config import (
     DEFAULT_CONFIG_PATH,
+    SAMPLE_CONFIG,
     Defaults,
     DomainConfig,
     MsadConfig,
@@ -80,6 +81,7 @@ __all__ = [
     "Attributes",
     # config
     "DEFAULT_CONFIG_PATH",
+    "SAMPLE_CONFIG",
     "Defaults",
     "DomainConfig",
     "MsadConfig",

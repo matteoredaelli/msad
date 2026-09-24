@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from msad.config import DomainConfig, load_config, load_domain_config
+from msad.config import SAMPLE_CONFIG, DomainConfig, load_config, load_domain_config
 from msad.exceptions import MsadConfigError
 
 VALID = """
@@ -107,3 +107,14 @@ host = "h"
 def test_invalid_toml_raises(tmp_path: Path) -> None:
     with pytest.raises(MsadConfigError, match="Invalid TOML"):
         load_config(_write(tmp_path, "this is = = not toml"))
+
+
+def test_sample_config_is_valid(tmp_path: Path) -> None:
+    """The shipped sample must always parse and validate against the schema."""
+    cfg = load_config(_write(tmp_path, SAMPLE_CONFIG))
+    # The default domain declared in [defaults] must exist under [domains].
+    d = cfg.get_domain()
+    assert d.host
+    assert d.search_base
+    # Sample ships with Kerberos auth (user/password commented out).
+    assert d.uses_kerberos is True

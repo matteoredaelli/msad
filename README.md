@@ -61,32 +61,38 @@ pipx install msad
 
 ## Configuration
 
-Create a configuration file at `$HOME/.msad.toml`. Print a sample to start from:
+msad reads a TOML file, `$HOME/.msad.toml` by default (override with
+`--config-file <path>`). The `init` command creates that file from a
+ready-to-edit template (it will not overwrite an existing file unless you pass
+`--force`):
 
 ```bash
-msad get-sample-config
+msad init
+# creates ~/.msad.toml (warns if it already exists)
+# then edit ~/.msad.toml
 ```
 
-Example `~/.msad.toml`:
+The template looks like this (abridged):
 
 ```toml
 [defaults]
+# Domain used when --domain is not passed on the command line.
 domain = "mydomain"
 
 [domains.mydomain]
 host = "dc.example.com"
 search_base = "dc=example,dc=com"
-port = 636
-use_ssl = true
+port = 636          # 389 for plain LDAP
+use_ssl = true      # false for plain LDAP
 
-# Omit user/password to authenticate with Kerberos (SASL).
-# Set both to authenticate with user/password:
+# Omit user/password to authenticate with Kerberos (SASL); get a ticket
+# first with `kinit`. Set BOTH to authenticate with user/password:
 # user = "svc_account"
 # password = "..."
 ```
 
-You can keep multiple domains under `[domains.<name>]` and select one at runtime
-with `--domain <name>`, or point to another file with `--config-file <path>`.
+You can declare multiple domains under `[domains.<name>]` and select one at
+runtime with `--domain <name>`.
 
 ## Usage
 
