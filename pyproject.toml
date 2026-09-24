@@ -1,19 +1,19 @@
 [project]
 name = "msad"
-version = "0.4.2"
 authors = [
   { name="Matteo Redaelli", email="matteo.redaelli@gmail.com" },
 ]
 description = "msad is a commandline for interacting with Active Directory"
 readme = "README.md"
 requires-python = ">=3.11"
+dynamic = ["version"]
 
 dependencies = [
-    "click==8.1.8",
-    "cryptography==44.0.2",
-    "gssapi==1.9.0",
+    "cryptography==50.0.1",
+    "gssapi==1.12.0",
     "ldap3==2.9.1",
-    "typer==0.15.2"
+    "pydantic>=2.9",
+    "typer==0.27.2",
 ]
 
 classifiers = [
@@ -31,5 +31,57 @@ Issues = "https://github.com/matteoredaelli/msad/issues"
 msad = "msad.main:app"
 
 [build-system]
-requires = ["hatchling >= 1.26"]
+requires = ["hatchling >= 1.32", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+# Derive the version from Git tags (e.g. tag "v0.5.0" -> version "0.5.0").
+# No manual version bump in this file is needed anymore: just create a tag.
+[tool.hatch.version]
+source = "vcs"
+
+# Write the resolved version to a generated module so it is importable at
+# runtime (msad.__version__) without re-inspecting Git.
+[tool.hatch.build.hooks.vcs]
+version-file = "src/msad/_version.py"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16",
+    "pyrefly>=0.16",
+    "pytest>=8.3",
+    "pytest-cov>=5.0",
+]
+
+[tool.ruff]
+target-version = "py311"
+src = ["src"]
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "W",   # pycodestyle warnings
+]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.pyrefly]
+project-includes = ["src", "tests"]
+python-version = "3.11"
+preset = "strict"
+
+# Tests receive pytest fixtures as parameters; don't require annotating them.
+[[tool.pyrefly.sub-config]]
+matches = "tests/**"
+
+[tool.pyrefly.sub-config.errors]
+implicit-any-parameter = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --cov=msad --cov-report=term-missing"

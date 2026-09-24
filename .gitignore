@@ -84,6 +84,10 @@ ipython_config.py
 # pyenv
 .python-version
 
+# hatch-vcs generated version file (written at build time)
+src/msad/_version.py
+.ruff_cache/
+
 # pipenv
 #   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
 #   However, in case of collaboration, if having platform-specific dependencies or dependencies

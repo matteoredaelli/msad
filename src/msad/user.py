@@ -16,122 +16,155 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import logging
-import getpass
-import ldap3
 import datetime
-from .search import disabled_users, get_dn, search, locked_users, never_expires_password
-from .group import group_member
+import logging
+from collections.abc import Iterator, Sequence
+from typing import Any
+
+from .exceptions import MsadNotFoundError
+from .group import is_member
+from .search import (
+    disabled_users,
+    escape_exact,
+    get_dn,
+    locked_users,
+    never_expires_password,
+    search,
+)
+from .types import LdapConnection, LdapEntries
 
 
-def _enter_password(text: str):
-    try:
-        p = getpass.getpass(text)
-    except Exception as error:
-        logging.error(error)
-        return None
-    else:
-        return p
+def change_password(
+    conn: LdapConnection,
+    search_base: str,
+    user: str,
+    new_password: str,
+    old_password: str | None = None,
+) -> Any:
+    """Change (or reset) a user's password.
 
+    This is a pure function: it does not prompt for input. The caller
+    (CLI or MCP) is responsible for collecting passwords securely.
 
-def change_password(conn, search_base: str, user: str):
+    Args:
+        conn: a bound ldap3 connection.
+        search_base: the AD search base.
+        user: sAMAccountName or DN of the user.
+        new_password: the new password to set.
+        old_password: the current password. Required for a self-service
+            change; omit (None) for an administrative reset.
+
+    Raises:
+        MsadNotFoundError: if the user cannot be resolved to a DN.
+    """
     user_dn = get_dn(conn, search_base, user)
-
     if not user_dn:
-        return None
+        raise MsadNotFoundError(f"User not found: {user}")
 
-    oldpwd = _enter_password("Old password: ")
-    newpwd = _enter_password("New password : ")
-    newpwd2 = _enter_password("New password (check): ")
-    if newpwd == newpwd2:
-        conn.extend.microsoft.modify_password(user_dn, newpwd, oldpwd)
+    return conn.extend.microsoft.modify_password(user_dn, new_password, old_password)
 
 
-def is_disabled(conn, search_base: str, user: str):
+def is_disabled(conn: LdapConnection, search_base: str, user: str) -> bool | None:
+    """Return True if the user account is disabled, None if not found."""
     result = disabled_users(
-        conn, search_base, f"(samaccountname={user})", limit=1, attributes=None
+        conn, search_base, f"(samaccountname={escape_exact(user)})", limit=1, attributes=None
     )
     logging.debug(result)
     return True if len(result) == 1 else None
 
 
-def is_locked(conn, search_base: str, user: str):
+def is_locked(conn: LdapConnection, search_base: str, user: str) -> bool | None:
+    """Return True if the user account is locked, None if not found."""
     result = locked_users(
-        conn, search_base, f"(samaccountname={user})", limit=1, attributes=None
+        conn, search_base, f"(samaccountname={escape_exact(user)})", limit=1, attributes=None
     )
     return True if len(result) == 1 else None
 
 
-def has_never_expires_password(conn, search_base: str, user: str):
+def has_never_expires_password(conn: LdapConnection, search_base: str, user: str) -> bool | None:
+    """Return True if the user's password never expires, None if not found."""
     result = never_expires_password(
-        conn, search_base, f"(samaccountname={user})", limit=1, attributes=None
+        conn, search_base, f"(samaccountname={escape_exact(user)})", limit=1, attributes=None
     )
     return True if len(result) == 1 else None
 
 
-def password_changed_in_days(conn, search_base: str, user: str, limit: int = 2000, max_age: int):
-    #    return search(conn, search_base, search_filter, attributes=attributes)
-    search_filter = f"(samaccountname={user})"
-    result = search(
-        conn, search_base, search_filter, limit=1, attributes=["pwdLastSet"]
-    )
+def password_changed_in_days(
+    conn: LdapConnection, search_base: str, user: str, max_age: int = 90
+) -> bool | None:
+    """Return True if the password is older than max_age days.
+
+    Returns None if the user (or pwdLastSet) is not found.
+    """
+    search_filter = f"(samaccountname={escape_exact(user)})"
+    result = search(conn, search_base, search_filter, limit=1, attributes=["pwdLastSet"])
 
     if len(result) == 0:
         return None
-    result = result[0]["pwdLastSet"]
-    logging.info(f"Password changed at {result}")
+    pwd_last_set = result[0]["pwdLastSet"]
+    logging.info(f"Password changed at {pwd_last_set}")
     now = datetime.datetime.now()
 
-    if result == 0:
+    if pwd_last_set == 0:
         return True
-    else:
-        delta = now - result.replace(tzinfo=None)
-        days = delta.days
-        return True if days > max_age else False
+    delta = now - pwd_last_set.replace(tzinfo=None)
+    return delta.days > max_age
 
 
-def check_user(conn, search_base:str, user:str, max_age:int, groups=[]):
-    # result = {}
-    yield ({"is_disabled": is_disabled(conn, search_base, user)})
-    yield ({"is_locked": is_locked(conn, search_base, user)})
-    yield (
-        {
-            "has_never_expires_password": has_never_expires_password(
-                conn, search_base, user
-            )
-        }
-    )
-    yield (
-        {"password_changed_in_days": password_changed_in_days(conn, search_base, user)}
-    )
-    yield (
-        {"has_expired_password": has_expired_password(conn, search_base, user, max_age)}
-    )
+def has_expired_password(
+    conn: LdapConnection, search_base: str, user: str, max_age: int = 90
+) -> bool | None:
+    """Check if the user's password is older than max_age days.
+
+    Users whose password never expires are treated as not expired.
+    """
+    if has_never_expires_password(conn, search_base, user):
+        return False
+    return password_changed_in_days(conn, search_base, user, max_age=max_age)
+
+
+def check_user(
+    conn: LdapConnection,
+    search_base: str,
+    user: str,
+    max_age: int,
+    groups: Sequence[str] | None = None,
+) -> Iterator[dict[str, Any]]:
+    """Yield a series of checks about a user (disabled, locked, password, ...).
+
+    Each yielded dict has a single key describing the check and its result.
+    """
+    groups = groups or []
+    yield {"is_disabled": is_disabled(conn, search_base, user)}
+    yield {"is_locked": is_locked(conn, search_base, user)}
+    yield {"has_never_expires_password": has_never_expires_password(conn, search_base, user)}
+    yield {"password_changed_in_days": password_changed_in_days(conn, search_base, user)}
+    yield {"has_expired_password": has_expired_password(conn, search_base, user, max_age)}
     for group in groups:
-        yield (
-            {
-                f"membership_{group}": group_member(
-                    conn, search_base, group=group, user=user
-                )
-            }
-        )
+        yield {f"membership_{group}": is_member(conn, search_base, group=group, user=user)}
 
 
-def user_groups(conn, search_base:str , limit: int, user: str, nested: bool =True):
-    """retrieve all groups (also nested) of a user"""
+def user_groups(
+    conn: LdapConnection,
+    search_base: str,
+    limit: int,
+    user: str,
+    nested: bool = True,
+) -> LdapEntries | None:
+    """Retrieve the groups of a user (nested by default).
 
+    Returns None if the user cannot be resolved to a DN.
+    """
     user_dn = get_dn(conn, search_base, user)
-
     if not user_dn:
         return None
 
+    attributes: list[str]
     if nested:
-        search_filter = f"(member:1.2.840.113556.1.4.1941:={user_dn})"
-        attributes = ["sAMaccountName"]
+        search_filter = f"(member:1.2.840.113556.1.4.1941:={escape_exact(user_dn)})"
+        attributes = ["sAMAccountName"]
     else:
         search_filter = "(objectClass=*)"
         search_base = user_dn
         attributes = ["memberOf"]
-    return search(
-        conn, search_base, search_filter, limit=limit, attributes=attributes
-    )
+    return search(conn, search_base, search_filter, limit=limit, attributes=attributes)
