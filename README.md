@@ -168,10 +168,9 @@ msad change-password matteo
 
 Most commands accept `--out-format`:
 
-- `json` (default): one JSON object per line
-- `json1`: a single JSON array
+- `jsonl` (default): one JSON object per line (JSON Lines / NDJSON)
+- `json`: a single JSON array
 - `csv`: tab-separated, list values joined with `|`
-- `default`: raw Python objects
 
 ## Development
 

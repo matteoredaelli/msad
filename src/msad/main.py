@@ -26,6 +26,7 @@ import logging
 import os
 import ssl
 from collections.abc import Callable
+from enum import StrEnum
 from typing import Any
 
 import ldap3
@@ -39,6 +40,14 @@ from msad.types import LdapEntries
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
 app = typer.Typer()
+
+
+class OutFormat(StrEnum):
+    """Output serialization formats for CLI commands."""
+
+    jsonl = "jsonl"  # one JSON object per line (JSON Lines / NDJSON)
+    json = "json"  # a single JSON array
+    csv = "csv"  # tab-separated, list values joined with "|"
 
 
 def _handle_errors(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -97,17 +106,21 @@ def _connect(domain: str | None, config_file: str | None) -> tuple[DomainConfig,
     return config, conn
 
 
-def _pprint(ldapresult: LdapEntries | None, out_format: str = "json", sep: str = "\t") -> Any:
-    if not ldapresult or out_format == "default":
+def _pprint(
+    ldapresult: LdapEntries | None, out_format: OutFormat = OutFormat.jsonl, sep: str = "\t"
+) -> Any:
+    if not ldapresult:
         return ldapresult
-    elif out_format == "json1":
-        return json.dumps(list(ldapresult), default=_json_converter)
+    elif out_format == OutFormat.json:
+        # A single, valid JSON array containing every object.
+        return json.dumps([dict(obj) for obj in ldapresult], default=_json_converter)
     else:
         result = ""
         for obj in ldapresult:
-            if out_format == "json":
+            if out_format == OutFormat.jsonl:
+                # JSON Lines / NDJSON: one JSON object per line.
                 result = result + json.dumps(dict(obj), default=_json_converter) + "\n"
-            elif out_format == "csv":
+            elif out_format == OutFormat.csv:
                 sorted_obj = dict(sorted(obj.items()))
                 new_values = [
                     "|".join(v) if isinstance(v, list) else str(v) for v in sorted_obj.values()
@@ -162,7 +175,7 @@ def group_members(
     limit: int = 2000,
     domain: str | None = None,
     config_file: str | None = None,
-    out_format: str = "json",
+    out_format: OutFormat = OutFormat.jsonl,
     attributes: list[str] | None = None,
 ):
     """Extract the members of a group (direct, or nested with --nested)."""
@@ -180,7 +193,7 @@ def search(
     limit: int = 2000,
     domain: str | None = None,
     config_file: str | None = None,
-    out_format: str = "json",
+    out_format: OutFormat = OutFormat.jsonl,
     attributes: list[str] | None = None,
 ):
     """Search Active Directory with a raw LDAP filter."""
@@ -197,7 +210,7 @@ def user_groups(
     limit: int = 2000,
     domain: str | None = None,
     config_file: str | None = None,
-    out_format: str = "json",
+    out_format: OutFormat = OutFormat.jsonl,
 ):
     """Extract the groups of a user (direct, or nested with --nested)."""
     config, conn = _connect(domain, config_file)
@@ -216,7 +229,7 @@ def user_search(
     limit: int = 2000,
     domain: str | None = None,
     config_file: str | None = None,
-    out_format: str = "json",
+    out_format: OutFormat = OutFormat.jsonl,
     attributes: list[str] | None = None,
 ):
     """Find users by field (name/surname/mail/sam/department, all ANDed)."""
@@ -241,7 +254,7 @@ def user_get(
     identifier: str,
     domain: str | None = None,
     config_file: str | None = None,
-    out_format: str = "json",
+    out_format: OutFormat = OutFormat.jsonl,
     attributes: list[str] | None = None,
 ):
     """Get a single user by sAMAccountName, UPN, mail or cn (exact match)."""
@@ -257,7 +270,7 @@ def group_search(
     limit: int = 2000,
     domain: str | None = None,
     config_file: str | None = None,
-    out_format: str = "json",
+    out_format: OutFormat = OutFormat.jsonl,
     attributes: list[str] | None = None,
 ):
     """Find groups by cn/name/sAMAccountName/displayName (supports * wildcards)."""
@@ -272,7 +285,7 @@ def group_get(
     identifier: str,
     domain: str | None = None,
     config_file: str | None = None,
-    out_format: str = "json",
+    out_format: OutFormat = OutFormat.jsonl,
     attributes: list[str] | None = None,
 ):
     """Get a single group by sAMAccountName or cn (exact match)."""
@@ -350,7 +363,7 @@ def check_user(
     group: list[str] | None = None,
     domain: str | None = None,
     config_file: str | None = None,
-    out_format: str = "json",
+    out_format: OutFormat = OutFormat.jsonl,
 ):
     """Run all checks on a user (disabled, locked, password, memberships)."""
     config, conn = _connect(domain, config_file)
