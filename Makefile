@@ -15,11 +15,11 @@
 UV_RUN := uv run --no-sync
 
 .DEFAULT_GOAL := help
-.PHONY: help sync test lint format typecheck build publish clean
+.PHONY: help sync test lint lint-check lint-format typecheck format build publish clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
-		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
+		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
 sync: ## Install/refresh the dev environment (needs the package index)
 	uv sync --group dev
@@ -27,10 +27,13 @@ sync: ## Install/refresh the dev environment (needs the package index)
 test: ## Run the test suite with coverage
 	$(UV_RUN) pytest
 
-lint: ## Run ruff check, ruff format --check and pyrefly (strict)
+lint: lint-check lint-format typecheck ## Run all linters (ruff check + format check + pyrefly)
+
+lint-check: ## Run ruff check (lint rules)
 	$(UV_RUN) ruff check src/ tests/
+
+lint-format: ## Run ruff format --check (formatting)
 	$(UV_RUN) ruff format --check src/ tests/
-	$(UV_RUN) pyrefly check
 
 format: ## Apply ruff autofixes and formatting
 	$(UV_RUN) ruff check --fix src/ tests/
