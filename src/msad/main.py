@@ -24,7 +24,6 @@ import getpass
 import json
 import logging
 import os
-import ssl
 from collections.abc import Callable
 from enum import StrEnum
 from pathlib import Path
@@ -35,6 +34,7 @@ import typer
 
 import msad
 from msad.config import DEFAULT_CONFIG_PATH, SAMPLE_CONFIG, DomainConfig, load_domain_config
+from msad.connection import connect
 from msad.exceptions import MsadError
 from msad.types import LdapEntries
 
@@ -73,37 +73,9 @@ def _json_converter(o: Any) -> Any:
     return o
 
 
-def _get_connection_krb(host: str, port: int, use_ssl: bool):
-    tls = ldap3.Tls(validate=ssl.CERT_NONE, version=ssl.PROTOCOL_TLSv1_2)
-    server = ldap3.Server(host, port=port, use_ssl=use_ssl, tls=tls)
-    return ldap3.Connection(
-        server,
-        authentication=ldap3.SASL,
-        sasl_mechanism=ldap3.KERBEROS,
-        auto_bind=False,
-    )
-
-
-def _get_connection_user_pwd(host: str, port: int, use_ssl: bool, user: str, password: str):
-    server = ldap3.Server(host, port=port, use_ssl=use_ssl)
-    return ldap3.Connection(server, user=user, password=password, auto_bind=False)
-
-
-def _get_connection(config: DomainConfig):
-    if config.uses_kerberos:
-        conn = _get_connection_krb(config.host, config.port, config.use_ssl)
-    else:
-        assert config.user is not None and config.password is not None
-        conn = _get_connection_user_pwd(
-            config.host, config.port, config.use_ssl, config.user, config.password
-        )
-    conn.bind()
-    return conn
-
-
 def _connect(domain: str | None, config_file: str | None) -> tuple[DomainConfig, ldap3.Connection]:
     config = load_domain_config(domain, config_file)
-    conn = _get_connection(config)
+    conn = connect(config)
     return config, conn
 
 
@@ -143,7 +115,7 @@ def change_password(user: str, domain: str | None = None, config_file: str | Non
         logging.error("Passwords do not match. Aborting.")
         raise typer.Exit(code=1)
 
-    msad.change_password(conn, config.search_base, user, new_password, old_password)
+    msad.change_password(conn, config.base, user, new_password, old_password)
 
 
 @app.command()
@@ -153,7 +125,7 @@ def group_add_member(
 ):
     """Add the user to a group (using DN or sAMAccountName)."""
     config, conn = _connect(domain, config_file)
-    result = msad.add_member(conn=conn, search_base=config.search_base, group=group, user=user)
+    result = msad.add_member(conn=conn, base=config.base, group=group, user=user)
     print(result)
 
 
@@ -164,7 +136,7 @@ def group_remove_member(
 ):
     """Remove the user from a group (using DN or sAMAccountName)."""
     config, conn = _connect(domain, config_file)
-    result = msad.remove_member(conn=conn, search_base=config.search_base, group=group, user=user)
+    result = msad.remove_member(conn=conn, base=config.base, group=group, user=user)
     print(result)
 
 
@@ -182,7 +154,7 @@ def group_members(
     """Extract the members of a group (direct, or nested with --nested)."""
     config, conn = _connect(domain, config_file)
     result = msad.group_members(
-        conn, config.search_base, group, nested=nested, limit=limit, attributes=attributes
+        conn, config.base, group, nested=nested, limit=limit, attributes=attributes
     )
     print(_pprint(result, out_format))
 
@@ -199,7 +171,7 @@ def search(
 ):
     """Search Active Directory with a raw LDAP filter."""
     config, conn = _connect(domain, config_file)
-    result = msad.search(conn, config.search_base, filter, limit=limit, attributes=attributes)
+    result = msad.search(conn, config.base, filter, limit=limit, attributes=attributes)
     print(_pprint(result, out_format))
 
 
@@ -215,7 +187,7 @@ def user_groups(
 ):
     """Extract the groups of a user (direct, or nested with --nested)."""
     config, conn = _connect(domain, config_file)
-    result = msad.user_groups(conn, config.search_base, limit, user, nested=nested)
+    result = msad.user_groups(conn, config.base, limit, user, nested=nested)
     print(_pprint(result, out_format))
 
 
@@ -227,6 +199,7 @@ def user_search(
     mail: str | None = None,
     sam: str | None = None,
     department: str | None = None,
+    base: str | None = None,
     limit: int = 2000,
     domain: str | None = None,
     config_file: str | None = None,
@@ -237,7 +210,7 @@ def user_search(
     config, conn = _connect(domain, config_file)
     result = msad.find_users(
         conn,
-        config.search_base,
+        base or config.base,
         name=name,
         surname=surname,
         mail=mail,
@@ -260,7 +233,7 @@ def user_get(
 ):
     """Get a single user by sAMAccountName, UPN, mail or cn (exact match)."""
     config, conn = _connect(domain, config_file)
-    result = msad.get_user(conn, config.search_base, identifier, attributes=attributes)
+    result = msad.get_user(conn, config.base, identifier, attributes=attributes)
     print(_pprint([result] if result else [], out_format))
 
 
@@ -268,6 +241,7 @@ def user_get(
 @_handle_errors
 def group_search(
     string: str,
+    base: str | None = None,
     limit: int = 2000,
     domain: str | None = None,
     config_file: str | None = None,
@@ -276,7 +250,7 @@ def group_search(
 ):
     """Find groups by cn/name/sAMAccountName/displayName (supports * wildcards)."""
     config, conn = _connect(domain, config_file)
-    result = msad.find_groups(conn, config.search_base, string, limit=limit, attributes=attributes)
+    result = msad.find_groups(conn, base or config.base, string, limit=limit, attributes=attributes)
     print(_pprint(result, out_format))
 
 
@@ -291,8 +265,208 @@ def group_get(
 ):
     """Get a single group by sAMAccountName or cn (exact match)."""
     config, conn = _connect(domain, config_file)
-    result = msad.get_group(conn, config.search_base, identifier, attributes=attributes)
+    result = msad.get_group(conn, config.base, identifier, attributes=attributes)
     print(_pprint([result] if result else [], out_format))
+
+
+@app.command()
+@_handle_errors
+def get_by_dn(
+    dn: str,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Fetch any entry directly by its DN (resolves manager / managedBy)."""
+    _, conn = _connect(domain, config_file)
+    result = msad.get_by_dn(conn, dn, attributes=attributes)
+    print(_pprint([result] if result else [], out_format))
+
+
+@app.command()
+@_handle_errors
+def computer_search(
+    name: str | None = None,
+    dns: str | None = None,
+    os: str | None = None,
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find computers by field (name/dns/os, all ANDed; values may contain *)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_computers(
+        conn,
+        base or config.base,
+        name=name,
+        dns=dns,
+        os=os,
+        limit=limit,
+        attributes=attributes,
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def computer_get(
+    identifier: str,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Get a single computer by sAMAccountName, cn or dNSHostName (exact match)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.get_computer(conn, config.base, identifier, attributes=attributes)
+    print(_pprint([result] if result else [], out_format))
+
+
+@app.command()
+@_handle_errors
+def ou_search(
+    name: str | None = None,
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find organizational units by name (matches ou; values may contain *)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_ous(conn, base or config.base, name=name, limit=limit, attributes=attributes)
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def ou_get(
+    identifier: str,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Get a single OU by its ou name or full DN (exact match)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.get_ou(conn, config.base, identifier, attributes=attributes)
+    print(_pprint([result] if result else [], out_format))
+
+
+@app.command()
+@_handle_errors
+def ou_contents(
+    ou_dn: str,
+    object_class: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """List the objects contained under an OU (optionally filtered by objectClass)."""
+    _, conn = _connect(domain, config_file)
+    result = msad.get_ou_contents(
+        conn, ou_dn, object_class=object_class, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def inactive_users(
+    days: int = 90,
+    base: str | None = None,
+    include_never: bool = False,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find enabled users whose last logon is older than --days (default 90)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_inactive_users(
+        conn,
+        base or config.base,
+        days=days,
+        include_never=include_never,
+        limit=limit,
+        attributes=attributes,
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def stale_computers(
+    days: int = 90,
+    base: str | None = None,
+    include_never: bool = False,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find computers whose last logon is older than --days (default 90)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_stale_computers(
+        conn,
+        base or config.base,
+        days=days,
+        include_never=include_never,
+        limit=limit,
+        attributes=attributes,
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def domain_info(
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Read the domain object: security settings and metadata (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.get_domain_info(conn, config.base, attributes=attributes)
+    print(_pprint([result] if result else [], out_format))
+
+
+@app.command()
+@_handle_errors
+def password_policy(
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+):
+    """Read the default domain password policy (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.get_password_policy(conn, config.base)
+    print(_pprint([result] if result else [], out_format))
+
+
+@app.command()
+@_handle_errors
+def privileged_groups(
+    with_members: bool = False,
+    nested: bool = False,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+):
+    """Report on well-known privileged groups and their member counts (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.get_privileged_groups(conn, config.base, with_members=with_members, nested=nested)
+    print(_pprint(result, out_format))
 
 
 @app.command()
@@ -305,7 +479,7 @@ def is_member(
 ):
     """Check whether a user is a (nested) member of a group. Prints true/false."""
     config, conn = _connect(domain, config_file)
-    result = msad.is_member(conn, config.search_base, group, user)
+    result = msad.is_member(conn, config.base, group, user)
     print("true" if result else "false")
 
 
@@ -322,7 +496,7 @@ def _print_bool(result: bool | None) -> None:
 def is_disabled(user: str, domain: str | None = None, config_file: str | None = None):
     """Check whether a user account is disabled. Prints true/false/not found."""
     config, conn = _connect(domain, config_file)
-    _print_bool(msad.is_disabled(conn, config.search_base, user))
+    _print_bool(msad.is_disabled(conn, config.base, user))
 
 
 @app.command()
@@ -330,7 +504,7 @@ def is_disabled(user: str, domain: str | None = None, config_file: str | None = 
 def is_locked(user: str, domain: str | None = None, config_file: str | None = None):
     """Check whether a user account is locked. Prints true/false/not found."""
     config, conn = _connect(domain, config_file)
-    _print_bool(msad.is_locked(conn, config.search_base, user))
+    _print_bool(msad.is_locked(conn, config.base, user))
 
 
 @app.command()
@@ -343,7 +517,7 @@ def has_expired_password(
 ):
     """Check whether a user's password is expired. Prints true/false/not found."""
     config, conn = _connect(domain, config_file)
-    _print_bool(msad.has_expired_password(conn, config.search_base, user, max_age=max_age))
+    _print_bool(msad.has_expired_password(conn, config.base, user, max_age=max_age))
 
 
 @app.command()
@@ -353,7 +527,7 @@ def has_never_expires_password(
 ):
     """Check whether a user's password never expires. Prints true/false/not found."""
     config, conn = _connect(domain, config_file)
-    _print_bool(msad.has_never_expires_password(conn, config.search_base, user))
+    _print_bool(msad.has_never_expires_password(conn, config.base, user))
 
 
 @app.command()
@@ -368,7 +542,7 @@ def check_user(
 ):
     """Run all checks on a user (disabled, locked, password, memberships)."""
     config, conn = _connect(domain, config_file)
-    result = list(msad.check_user(conn, config.search_base, user, max_age=max_age, groups=group))
+    result = list(msad.check_user(conn, config.base, user, max_age=max_age, groups=group))
     print(_pprint(result, out_format))
 
 

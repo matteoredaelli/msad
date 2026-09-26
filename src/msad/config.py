@@ -14,7 +14,7 @@ The TOML file (``~/.msad.toml`` by default) looks like::
 
     [domains.mydomain]
     host = "example.com"
-    search_base = "dc=example,dc=com"
+    base = "dc=example,dc=com"
     port = 636
     use_ssl = true
     # user = "..."      # optional, enables user/password bind
@@ -35,7 +35,7 @@ class DomainConfig(BaseModel):
     """Connection settings for a single AD domain."""
 
     host: str
-    search_base: str
+    base: str
     port: int = 389
     use_ssl: bool = False
     user: str | None = None
@@ -86,7 +86,7 @@ domain = "mydomain"
 
 [domains.mydomain]
 host = "dc.example.com"
-search_base = "dc=example,dc=com"
+base = "dc=example,dc=com"
 
 # LDAPS (recommended). For plain LDAP use port 389 and use_ssl = false.
 port = 636
@@ -102,7 +102,7 @@ use_ssl = true
 # You can declare more domains and select one with --domain <name>:
 # [domains.otherdomain]
 # host = "dc.other.example.com"
-# search_base = "dc=other,dc=example,dc=com"
+# base = "dc=other,dc=example,dc=com"
 """
 
 

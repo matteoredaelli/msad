@@ -15,9 +15,11 @@
 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+import datetime
 import logging
 
 import ldap3
+from ldap3.core.exceptions import LDAPExceptionError
 from ldap3.utils.conv import escape_filter_chars
 
 from ._deprecation import warn_deprecated
@@ -34,6 +36,16 @@ DEFAULT_USER_ATTRIBUTES = [
     "userPrincipalName",
     "department",
     "title",
+    "company",
+    "physicalDeliveryOfficeName",
+    "telephoneNumber",
+    "employeeID",
+    "manager",
+    "memberOf",
+    "userAccountControl",
+    "accountExpires",
+    "lastLogonTimestamp",
+    "whenCreated",
     "distinguishedName",
 ]
 
@@ -43,7 +55,34 @@ DEFAULT_GROUP_ATTRIBUTES = [
     "cn",
     "displayName",
     "description",
+    "managedBy",
     "mail",
+    "member",
+    "groupType",
+    "whenCreated",
+    "distinguishedName",
+]
+
+#: A sensible default set of computer attributes.
+DEFAULT_COMPUTER_ATTRIBUTES = [
+    "sAMAccountName",
+    "cn",
+    "dNSHostName",
+    "operatingSystem",
+    "operatingSystemVersion",
+    "userAccountControl",
+    "lastLogonTimestamp",
+    "description",
+    "managedBy",
+    "distinguishedName",
+]
+
+DEFAULT_OU_ATTRIBUTES = [
+    "ou",
+    "name",
+    "description",
+    "managedBy",
+    "whenCreated",
     "distinguishedName",
 ]
 
@@ -69,7 +108,7 @@ def escape_pattern(value: str) -> str:
 
 def search(
     conn: LdapConnection,
-    search_base: str,
+    base: str,
     search_filter: str,
     limit: int = 0,
     attributes: Attributes = None,
@@ -84,7 +123,7 @@ def search(
 
     Args:
         conn: a bound ldap3 connection.
-        search_base: the DN to search under.
+        base: the DN to search under.
         search_filter: a raw LDAP filter.
         limit: max number of entries (0 = no limit).
         attributes: attributes to fetch (None = all attributes).
@@ -95,7 +134,7 @@ def search(
     effective_attributes = attributes if attributes else ldap3.ALL_ATTRIBUTES
 
     resultgenerator = conn.extend.standard.paged_search(
-        search_base, search_filter, size_limit=limit, attributes=effective_attributes
+        base, search_filter, size_limit=limit, attributes=effective_attributes
     )
     result = list(resultgenerator)
     entries = [r["attributes"] for r in result if "dn" in r]
@@ -105,7 +144,7 @@ def search(
 
 def users(
     conn: LdapConnection,
-    search_base: str,
+    base: str,
     string: str,
     limit: int = 0,
     attributes: Attributes = None,
@@ -121,12 +160,12 @@ def users(
         f"(&(objectclass=user)(|(samaccountname={value})(mail={value})"
         f"(cn={value}*)(userPrincipalName={value}*)))"
     )
-    return search(conn, search_base, search_filter, limit=limit, attributes=attributes)
+    return search(conn, base, search_filter, limit=limit, attributes=attributes)
 
 
 def find_users(
     conn: LdapConnection,
-    search_base: str,
+    base: str,
     *,
     name: str | None = None,
     surname: str | None = None,
@@ -166,7 +205,7 @@ def find_users(
     search_filter = f"(&(objectClass=user)(objectCategory=person){inner})"
     return search(
         conn,
-        search_base,
+        base,
         search_filter,
         limit=limit,
         attributes=attributes or DEFAULT_USER_ATTRIBUTES,
@@ -175,7 +214,7 @@ def find_users(
 
 def get_user(
     conn: LdapConnection,
-    search_base: str,
+    base: str,
     identifier: str,
     attributes: Attributes = None,
 ) -> LdapEntry | None:
@@ -191,7 +230,7 @@ def get_user(
     )
     result = search(
         conn,
-        search_base,
+        base,
         search_filter,
         limit=1,
         attributes=attributes or DEFAULT_USER_ATTRIBUTES,
@@ -199,7 +238,276 @@ def get_user(
     return result[0] if result else None
 
 
-def get_dn(conn: LdapConnection, search_base: str, entry: str) -> str | None:
+def find_computers(
+    conn: LdapConnection,
+    base: str,
+    *,
+    name: str | None = None,
+    dns: str | None = None,
+    os: str | None = None,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find computers by one or more specific fields (all ANDed together).
+
+    Each provided criterion is matched independently; values may contain
+    ``*`` wildcards. Passing no criteria matches all computers.
+
+    Args:
+        name: matches ``cn`` (computer name).
+        dns: matches ``dNSHostName`` (FQDN).
+        os: matches ``operatingSystem``.
+
+    Returns:
+        A list of matching computer entries (default attributes if none given).
+    """
+    clauses: list[str] = []
+    for attr, value in (
+        ("cn", name),
+        ("dNSHostName", dns),
+        ("operatingSystem", os),
+    ):
+        if value:
+            clauses.append(f"({attr}={escape_pattern(value)})")
+
+    inner = "".join(clauses)
+    search_filter = f"(&(objectClass=computer){inner})"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_COMPUTER_ATTRIBUTES,
+    )
+
+
+def get_computer(
+    conn: LdapConnection,
+    base: str,
+    identifier: str,
+    attributes: Attributes = None,
+) -> LdapEntry | None:
+    """Return a single computer matched by sAMAccountName, cn or dNSHostName.
+
+    Uses an exact match. The machine ``sAMAccountName`` ends with ``$``; if the
+    identifier does not, both forms are tried, so ``PC001`` matches ``PC001$``.
+    Returns the first match, or None if no computer is found.
+    """
+    value = escape_exact(identifier)
+    sam = value if identifier.endswith("$") else f"{value}$"
+    search_filter = (
+        f"(&(objectClass=computer)(|(sAMAccountName={sam})(cn={value})(dNSHostName={value})))"
+    )
+    result = search(
+        conn,
+        base,
+        search_filter,
+        limit=1,
+        attributes=attributes or DEFAULT_COMPUTER_ATTRIBUTES,
+    )
+    return result[0] if result else None
+
+
+def get_by_dn(
+    conn: LdapConnection,
+    dn: str,
+    attributes: Attributes = None,
+) -> LdapEntry | None:
+    """Fetch a single entry directly by its distinguished name (DN).
+
+    This is the most efficient lookup: the DN is used as the search base with
+    a catch-all filter, so the server returns exactly that object (or nothing).
+    Handy to resolve DN-valued attributes such as ``manager`` (users) or
+    ``managedBy`` (groups) into full records.
+
+    Args:
+        conn: a bound ldap3 connection.
+        dn: the distinguished name of the entry to fetch.
+        attributes: attributes to fetch (None = all attributes).
+
+    Returns:
+        The entry as a dict of attribute name -> value(s), or None if the DN
+        does not exist (or is malformed).
+    """
+    try:
+        result = search(conn, dn, "(objectClass=*)", limit=1, attributes=attributes)
+    except LDAPExceptionError as exc:
+        # e.g. the DN does not exist (noSuchObject) or is syntactically invalid.
+        logging.debug("get_by_dn(%r) failed: %s", dn, exc)
+        return None
+    return result[0] if result else None
+
+
+def find_ous(
+    conn: LdapConnection,
+    base: str,
+    *,
+    name: str | None = None,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find organizational units (OUs).
+
+    Args:
+        base: the DN to search under (whole domain by default, or a parent OU).
+        name: matches ``ou`` (the OU name); may contain ``*`` wildcards.
+            Passing no name matches all OUs.
+
+    Returns:
+        A list of matching OU entries (default attributes if none given).
+    """
+    inner = f"(ou={escape_pattern(name)})" if name else ""
+    search_filter = f"(&(objectClass=organizationalUnit){inner})"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_OU_ATTRIBUTES,
+    )
+
+
+def get_ou(
+    conn: LdapConnection,
+    base: str,
+    identifier: str,
+    attributes: Attributes = None,
+) -> LdapEntry | None:
+    """Return a single OU matched by its ``ou`` name or full DN (exact match).
+
+    Returns the first match, or None if no OU is found.
+    """
+    value = escape_exact(identifier)
+    search_filter = f"(&(objectClass=organizationalUnit)(|(ou={value})(distinguishedName={value})))"
+    result = search(
+        conn,
+        base,
+        search_filter,
+        limit=1,
+        attributes=attributes or DEFAULT_OU_ATTRIBUTES,
+    )
+    return result[0] if result else None
+
+
+def get_ou_contents(
+    conn: LdapConnection,
+    ou_dn: str,
+    *,
+    object_class: str | None = None,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """List the objects contained under an OU (using the OU DN as search base).
+
+    Args:
+        ou_dn: the distinguished name of the OU whose contents to list.
+        object_class: restrict to a single ``objectClass`` (e.g. ``user``,
+            ``group``, ``computer``, ``organizationalUnit``). None returns
+            every object under the OU.
+
+    Returns:
+        A list of entries below the OU, or an empty list if the OU does not
+        exist (or the DN is malformed).
+    """
+    cls = escape_exact(object_class) if object_class else "*"
+    search_filter = f"(objectClass={cls})"
+    try:
+        return search(conn, ou_dn, search_filter, limit=limit, attributes=attributes)
+    except LDAPExceptionError as exc:
+        logging.debug("get_ou_contents(%r) failed: %s", ou_dn, exc)
+        return []
+
+
+#: Offset in seconds between the Windows FILETIME epoch (1601-01-01) and the
+#: Unix epoch (1970-01-01).
+_FILETIME_EPOCH_OFFSET = 11644473600
+
+
+def _days_ago_filetime(days: int) -> int:
+    """Return the Windows FILETIME for ``now - days``.
+
+    AD stores ``lastLogonTimestamp`` (and similar) as FILETIME: the number of
+    100-nanosecond intervals since 1601-01-01 UTC. LDAP range filters must use
+    this integer form, so we convert a day-based cutoff here.
+    """
+    cutoff = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=days)
+    unix_seconds = cutoff.timestamp()
+    return int((unix_seconds + _FILETIME_EPOCH_OFFSET) * 10_000_000)
+
+
+def find_inactive_users(
+    conn: LdapConnection,
+    base: str,
+    *,
+    days: int = 90,
+    include_never: bool = False,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find enabled users whose last logon is older than ``days`` days.
+
+    Matches users whose ``lastLogonTimestamp`` is at or before the cutoff.
+
+    Args:
+        base: the DN to search under (whole domain by default, or an OU).
+        days: inactivity threshold in days (default 90).
+        include_never: also return users that have never logged on (no
+            ``lastLogonTimestamp`` attribute). Defaults to False.
+
+    Returns:
+        A list of matching user entries (default attributes if none given).
+    """
+    cutoff = _days_ago_filetime(days)
+    stale = f"(lastLogonTimestamp<={cutoff})"
+    if include_never:
+        stale = f"(|{stale}(!(lastLogonTimestamp=*)))"
+    search_filter = f"(&(objectClass=user)(objectCategory=person){stale})"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_USER_ATTRIBUTES,
+    )
+
+
+def find_stale_computers(
+    conn: LdapConnection,
+    base: str,
+    *,
+    days: int = 90,
+    include_never: bool = False,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find computers whose last logon is older than ``days`` days.
+
+    Matches computers whose ``lastLogonTimestamp`` is at or before the cutoff.
+
+    Args:
+        base: the DN to search under (whole domain by default, or an OU).
+        days: staleness threshold in days (default 90).
+        include_never: also return computers that have never logged on (no
+            ``lastLogonTimestamp`` attribute). Defaults to False.
+
+    Returns:
+        A list of matching computer entries (default attributes if none given).
+    """
+    cutoff = _days_ago_filetime(days)
+    stale = f"(lastLogonTimestamp<={cutoff})"
+    if include_never:
+        stale = f"(|{stale}(!(lastLogonTimestamp=*)))"
+    search_filter = f"(&(objectClass=computer){stale})"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_COMPUTER_ATTRIBUTES,
+    )
+
+
+def get_dn(conn: LdapConnection, base: str, entry: str) -> str | None:
     """Resolve an sAMAccountName (or DN) to a distinguished name.
 
     Returns the DN unchanged if ``entry`` already looks like a DN
@@ -208,7 +516,7 @@ def get_dn(conn: LdapConnection, search_base: str, entry: str) -> str | None:
     if entry.lower().startswith("cn="):
         return entry
     search_filter = f"(sAMAccountName={escape_exact(entry)})"
-    result = search(conn, search_base, search_filter, attributes=["distinguishedName"])
+    result = search(conn, base, search_filter, attributes=["distinguishedName"])
     logging.debug(result)
     if len(result) < 1:
         logging.error(f"entry {entry} not found")
@@ -219,7 +527,7 @@ def get_dn(conn: LdapConnection, search_base: str, entry: str) -> str | None:
 
 def never_expires_password(
     conn: LdapConnection,
-    search_base: str,
+    base: str,
     extra_filter: str = "",
     limit: int = 0,
     attributes: Attributes = None,
@@ -228,12 +536,12 @@ def never_expires_password(
     search_filter = (
         f"(&(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=65536){extra_filter})"
     )
-    return search(conn, search_base, search_filter, limit=limit, attributes=attributes)
+    return search(conn, base, search_filter, limit=limit, attributes=attributes)
 
 
 def disabled_users(
     conn: LdapConnection,
-    search_base: str,
+    base: str,
     extra_filter: str = "",
     limit: int = 0,
     attributes: Attributes = None,
@@ -243,16 +551,16 @@ def disabled_users(
         f"(&(objectCategory=Person)(objectClass=User){extra_filter}"
         f"(userAccountControl:1.2.840.113556.1.4.803:=2))"
     )
-    return search(conn, search_base, search_filter, limit=limit, attributes=attributes)
+    return search(conn, base, search_filter, limit=limit, attributes=attributes)
 
 
 def locked_users(
     conn: LdapConnection,
-    search_base: str,
+    base: str,
     extra_filter: str = "",
     limit: int = 0,
     attributes: Attributes = None,
 ) -> LdapEntries:
     """Search locked-out user accounts (lockoutTime >= 1)."""
     search_filter = f"(&(objectCategory=Person)(objectClass=User){extra_filter}(lockoutTime>=1))"
-    return search(conn, search_base, search_filter, attributes=attributes)
+    return search(conn, base, search_filter, attributes=attributes)

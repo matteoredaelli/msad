@@ -33,7 +33,7 @@ from .types import Attributes, LdapConnection, LdapEntries, LdapEntry
 
 def find_groups(
     conn: LdapConnection,
-    search_base: str,
+    base: str,
     string: str,
     limit: int = 0,
     attributes: Attributes = None,
@@ -49,7 +49,7 @@ def find_groups(
     )
     return search(
         conn,
-        search_base,
+        base,
         search_filter,
         limit=limit,
         attributes=attributes or DEFAULT_GROUP_ATTRIBUTES,
@@ -58,7 +58,7 @@ def find_groups(
 
 def get_group(
     conn: LdapConnection,
-    search_base: str,
+    base: str,
     identifier: str,
     attributes: Attributes = None,
 ) -> LdapEntry | None:
@@ -70,7 +70,7 @@ def get_group(
     search_filter = f"(&(objectClass=group)(|(sAMAccountName={value})(cn={value})))"
     result = search(
         conn,
-        search_base,
+        base,
         search_filter,
         limit=1,
         attributes=attributes or DEFAULT_GROUP_ATTRIBUTES,
@@ -78,34 +78,34 @@ def get_group(
     return result[0] if result else None
 
 
-def add_member(conn: LdapConnection, search_base: str, group: str, user: str) -> Any:
+def add_member(conn: LdapConnection, base: str, group: str, user: str) -> Any:
     """Add a user to a group (both given as DN or sAMAccountName).
 
     Raises:
         MsadNotFoundError: if the group or user cannot be resolved.
     """
-    group_dn = get_dn(conn, search_base, group)
+    group_dn = get_dn(conn, base, group)
     if not group_dn:
         raise MsadNotFoundError(f"Group not found: {group}")
 
-    user_dn = get_dn(conn, search_base, user)
+    user_dn = get_dn(conn, base, user)
     if not user_dn:
         raise MsadNotFoundError(f"User not found: {user}")
 
     return conn.extend.microsoft.add_members_to_groups([user_dn], [group_dn])
 
 
-def remove_member(conn: LdapConnection, search_base: str, group: str, user: str) -> Any:
+def remove_member(conn: LdapConnection, base: str, group: str, user: str) -> Any:
     """Remove a user from a group (both given as DN or sAMAccountName).
 
     Raises:
         MsadNotFoundError: if the group or user cannot be resolved.
     """
-    group_dn = get_dn(conn, search_base, group)
+    group_dn = get_dn(conn, base, group)
     if not group_dn:
         raise MsadNotFoundError(f"Group not found: {group}")
 
-    user_dn = get_dn(conn, search_base, user)
+    user_dn = get_dn(conn, base, user)
     if not user_dn:
         raise MsadNotFoundError(f"User not found: {user}")
 
@@ -114,7 +114,7 @@ def remove_member(conn: LdapConnection, search_base: str, group: str, user: str)
 
 def group_members(
     conn: LdapConnection,
-    search_base: str,
+    base: str,
     group: str,
     nested: bool = False,
     limit: int = 0,
@@ -130,7 +130,7 @@ def group_members(
     Raises:
         MsadNotFoundError: if the group cannot be resolved.
     """
-    group_dn = get_dn(conn, search_base, group)
+    group_dn = get_dn(conn, base, group)
     if not group_dn:
         raise MsadNotFoundError(f"Group not found: {group}")
 
@@ -139,20 +139,20 @@ def group_members(
         f"memberOf:1.2.840.113556.1.4.1941:={escaped}" if nested else f"memberOf={escaped}"
     )
     search_filter = f"(&(objectClass=person)(sAMAccountName=*)({member_clause}))"
-    return search(conn, search_base, search_filter, limit=limit, attributes=attributes)
+    return search(conn, base, search_filter, limit=limit, attributes=attributes)
 
 
-def is_member(conn: LdapConnection, search_base: str, group: str, user: str) -> bool:
+def is_member(conn: LdapConnection, base: str, group: str, user: str) -> bool:
     """Check whether a user is a (possibly nested) member of a group.
 
     Raises:
         MsadNotFoundError: if the group or user cannot be resolved.
     """
-    group_dn = get_dn(conn, search_base, group)
+    group_dn = get_dn(conn, base, group)
     if not group_dn:
         raise MsadNotFoundError(f"Group not found: {group}")
 
-    user_dn = get_dn(conn, search_base, user)
+    user_dn = get_dn(conn, base, user)
     if not user_dn:
         raise MsadNotFoundError(f"User not found: {user}")
 
@@ -160,7 +160,7 @@ def is_member(conn: LdapConnection, search_base: str, group: str, user: str) -> 
         f"(&(memberOf:1.2.840.113556.1.4.1941:={escape_exact(group_dn)})"
         f"(objectCategory=person)(objectClass=user)(distinguishedName={escape_exact(user_dn)}))"
     )
-    result = search(conn, search_base, search_filter)
+    result = search(conn, base, search_filter)
     return len(result) == 1
 
 
@@ -169,17 +169,17 @@ def is_member(conn: LdapConnection, search_base: str, group: str, user: str) -> 
 
 def group_flat_members(
     conn: LdapConnection,
-    search_base: str,
+    base: str,
     group: str,
     limit: int = 0,
     attributes: Attributes = None,
 ) -> LdapEntries:
     """Deprecated: use ``group_members(..., nested=True)`` instead."""
     warn_deprecated("group_flat_members()", "group_members(..., nested=True)")
-    return group_members(conn, search_base, group, nested=True, limit=limit, attributes=attributes)
+    return group_members(conn, base, group, nested=True, limit=limit, attributes=attributes)
 
 
-def group_member(conn: LdapConnection, search_base: str, group: str, user: str) -> bool:
+def group_member(conn: LdapConnection, base: str, group: str, user: str) -> bool:
     """Deprecated: use ``is_member()`` instead."""
     warn_deprecated("group_member()", "is_member()")
-    return is_member(conn, search_base, group, user)
+    return is_member(conn, base, group, user)

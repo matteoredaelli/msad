@@ -20,6 +20,14 @@ except ImportError:  # pragma: no cover - only when running from an unbuilt tree
     except PackageNotFoundError:
         __version__ = "0.0.0.dev0"
 
+from .audit import (
+    DEFAULT_DOMAIN_ATTRIBUTES,
+    DEFAULT_PASSWORD_POLICY_ATTRIBUTES,
+    DEFAULT_PRIVILEGED_GROUPS,
+    get_domain_info,
+    get_password_policy,
+    get_privileged_groups,
+)
 from .config import (
     DEFAULT_CONFIG_PATH,
     SAMPLE_CONFIG,
@@ -29,6 +37,7 @@ from .config import (
     load_config,
     load_domain_config,
 )
+from .connection import connect
 from .exceptions import (
     MsadConfigError,
     MsadConnectionError,
@@ -46,13 +55,23 @@ from .group import (
     remove_member,
 )
 from .search import (
+    DEFAULT_COMPUTER_ATTRIBUTES,
     DEFAULT_GROUP_ATTRIBUTES,
+    DEFAULT_OU_ATTRIBUTES,
     DEFAULT_USER_ATTRIBUTES,
     disabled_users,
     escape_exact,
     escape_pattern,
+    find_computers,
+    find_inactive_users,
+    find_ous,
+    find_stale_computers,
     find_users,
+    get_by_dn,
+    get_computer,
     get_dn,
+    get_ou,
+    get_ou_contents,
     get_user,
     locked_users,
     never_expires_password,
@@ -87,6 +106,8 @@ __all__ = [
     "MsadConfig",
     "load_config",
     "load_domain_config",
+    # connection
+    "connect",
     # exceptions
     "MsadError",
     "MsadConfigError",
@@ -97,6 +118,14 @@ __all__ = [
     "users",
     "find_users",
     "get_user",
+    "find_computers",
+    "get_computer",
+    "find_ous",
+    "get_ou",
+    "get_ou_contents",
+    "find_inactive_users",
+    "find_stale_computers",
+    "get_by_dn",
     "get_dn",
     "disabled_users",
     "locked_users",
@@ -105,6 +134,15 @@ __all__ = [
     "escape_pattern",
     "DEFAULT_USER_ATTRIBUTES",
     "DEFAULT_GROUP_ATTRIBUTES",
+    "DEFAULT_COMPUTER_ATTRIBUTES",
+    "DEFAULT_OU_ATTRIBUTES",
+    # audit (read-only)
+    "get_domain_info",
+    "get_password_policy",
+    "get_privileged_groups",
+    "DEFAULT_DOMAIN_ATTRIBUTES",
+    "DEFAULT_PASSWORD_POLICY_ATTRIBUTES",
+    "DEFAULT_PRIVILEGED_GROUPS",
     # group
     "add_member",
     "remove_member",

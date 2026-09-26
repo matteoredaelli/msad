@@ -11,7 +11,12 @@ Features:
 - [X] search objects (users, groups, computers, ...) with a raw LDAP filter
 - [X] search users by field (name, surname, mail, sAMAccountName, department)
 - [X] search groups by name / cn / sAMAccountName / displayName
+- [X] search computers by name / dNSHostName / operatingSystem
+- [X] search organizational units (OUs) and list their contents
+- [X] find inactive users / stale computers (last logon older than N days)
+- [X] audit reads: domain info, default password policy, privileged groups
 - [X] get a single user or group
+- [X] fetch any entry directly by its DN (resolve `manager` / `managedBy`)
 - [X] list group members (direct or recursive/nested)
 - [X] list a user's groups (direct or recursive/nested)
 - [X] check whether a user is a (nested) member of a group
@@ -19,6 +24,12 @@ Features:
 - [X] change AD passwords
 - [X] check if a user is disabled, locked, or has an expired/never-expiring password
 - [X] LDAP filter escaping to prevent injection
+
+By default, user lookups return a useful attribute set — identity fields plus
+`manager` (the DN of the user's manager), `memberOf` (direct group DNs),
+`userAccountControl`, `accountExpires`, `lastLogonTimestamp` and `whenCreated`.
+Group lookups include `managedBy` (owner DN), `member`, `groupType` and
+`whenCreated`. Pass `--attributes` to override the defaults.
 
 ## Prerequisites
 
@@ -81,7 +92,7 @@ domain = "mydomain"
 
 [domains.mydomain]
 host = "dc.example.com"
-search_base = "dc=example,dc=com"
+base = "dc=example,dc=com"
 port = 636          # 389 for plain LDAP
 use_ssl = true      # false for plain LDAP
 
@@ -127,6 +138,41 @@ msad group-search "qlik_*"
 
 # Get a single group
 msad group-get qlik_analyzer_users
+
+# Find computers (name / dNSHostName / operatingSystem, values may contain *)
+msad computer-search --name "PC0*" --os "Windows Server*"
+
+# Get a single computer (sAMAccountName with or without trailing $, cn, or FQDN)
+msad computer-get PC001
+
+# Restrict any search to a specific OU subtree with --base
+msad user-search --surname "Rossi" --base "OU=Sales,DC=group,DC=example,DC=com"
+
+# Find organizational units (name matches the ou attribute; may contain *)
+msad ou-search --name "Sales*"
+
+# Get a single OU by its ou name or full DN
+msad ou-get "OU=Sales,DC=group,DC=example,DC=com"
+
+# List everything under an OU (optionally filter by objectClass)
+msad ou-contents "OU=Sales,DC=group,DC=example,DC=com"
+msad ou-contents "OU=Sales,DC=group,DC=example,DC=com" --object-class user
+
+# Find users who haven't logged in for 90 days (default)
+msad inactive-users
+
+# Inactive users in a specific OU, last 30 days
+msad inactive-users --days 30 --base "OU=Staff,DC=group,DC=example,DC=com"
+
+# Find computers that haven't logged on in 180 days
+msad stale-computers --days 180
+
+# Include accounts that have never logged on (no lastLogonTimestamp)
+msad inactive-users --days 90 --include-never
+msad stale-computers --days 180 --include-never
+
+# Fetch any entry by its DN (e.g. resolve a user's manager)
+msad get-by-dn "CN=Anna Bianchi,OU=Staff,DC=group,DC=example,DC=com"
 ```
 
 ### Groups and membership
@@ -148,6 +194,23 @@ msad is-member qlik_analyzer_users matteo
 # Add / remove a member (by DN or sAMAccountName)
 msad group-add-member qlik_analyzer_users matteo
 msad group-remove-member qlik_analyzer_users matteo
+```
+
+### Auditing (read-only)
+
+```bash
+# Domain object: security-relevant settings and metadata
+msad domain-info
+
+# Default domain password policy (maxPwdAge, minPwdLength, lockout, ...)
+msad password-policy
+
+# Well-known privileged groups with member counts
+msad privileged-groups
+
+# Include the actual members (optionally expand nested membership)
+msad privileged-groups --with-members
+msad privileged-groups --with-members --nested
 ```
 
 ### Account checks

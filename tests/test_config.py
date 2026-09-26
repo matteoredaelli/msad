@@ -15,13 +15,13 @@ domain = "d1"
 
 [domains.d1]
 host = "dc1.example.com"
-search_base = "dc=example,dc=com"
+base = "dc=example,dc=com"
 port = 636
 use_ssl = true
 
 [domains.d2]
 host = "dc2.example.com"
-search_base = "dc=other,dc=com"
+base = "dc=other,dc=com"
 port = 389
 use_ssl = false
 user = "svc"
@@ -55,19 +55,19 @@ def test_explicit_domain_selected(tmp_path: Path) -> None:
 
 
 def test_uses_kerberos() -> None:
-    krb = DomainConfig(host="h", search_base="dc=x")
+    krb = DomainConfig(host="h", base="dc=x")
     assert krb.uses_kerberos is True
 
-    userpwd = DomainConfig(host="h", search_base="dc=x", user="u", password="p")
+    userpwd = DomainConfig(host="h", base="dc=x", user="u", password="p")
     assert userpwd.uses_kerberos is False
 
     # user without password -> still kerberos (both required)
-    partial = DomainConfig(host="h", search_base="dc=x", user="u")
+    partial = DomainConfig(host="h", base="dc=x", user="u")
     assert partial.uses_kerberos is True
 
 
 def test_defaults_port_and_ssl() -> None:
-    d = DomainConfig(host="h", search_base="dc=x")
+    d = DomainConfig(host="h", base="dc=x")
     assert d.port == 389
     assert d.use_ssl is False
 
@@ -86,7 +86,7 @@ def test_missing_defaults_section_raises(tmp_path: Path) -> None:
     content = """
 [domains.d1]
 host = "h"
-search_base = "dc=x"
+base = "dc=x"
 """
     with pytest.raises(MsadConfigError):
         load_config(_write(tmp_path, content))
@@ -99,7 +99,7 @@ domain = "d1"
 
 [domains.d1]
 host = "h"
-"""  # missing search_base
+"""  # missing base
     with pytest.raises(MsadConfigError):
         load_config(_write(tmp_path, content))
 
@@ -115,6 +115,6 @@ def test_sample_config_is_valid(tmp_path: Path) -> None:
     # The default domain declared in [defaults] must exist under [domains].
     d = cfg.get_domain()
     assert d.host
-    assert d.search_base
+    assert d.base
     # Sample ships with Kerberos auth (user/password commented out).
     assert d.uses_kerberos is True
