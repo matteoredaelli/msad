@@ -15,6 +15,8 @@ Features:
 - [X] search organizational units (OUs) and list their contents
 - [X] find inactive users / stale computers (last logon older than N days)
 - [X] audit reads: domain info, default password policy, privileged groups
+- [X] find users whose password violates the domain policy
+- [X] test AD connectivity (health check)
 - [X] get a single user or group
 - [X] fetch any entry directly by its DN (resolve `manager` / `managedBy`)
 - [X] list group members (direct or recursive/nested)
@@ -118,6 +120,13 @@ For Kerberos authentication, first obtain a ticket:
 kinit            # or: kinit myaduser
 ```
 
+Verify connectivity and authentication before running other commands:
+
+```bash
+# Prints an ok/target/auth/error status; exits non-zero on failure
+msad test-connection
+```
+
 ### Searching
 
 ```bash
@@ -204,6 +213,9 @@ msad domain-info
 
 # Default domain password policy (maxPwdAge, minPwdLength, lockout, ...)
 msad password-policy
+
+# Users whose password violates the policy (expired, or must change at logon)
+msad password-policy-violations
 
 # Well-known privileged groups with member counts
 msad privileged-groups

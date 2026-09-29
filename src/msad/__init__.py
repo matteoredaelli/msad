@@ -24,8 +24,10 @@ from .audit import (
     DEFAULT_DOMAIN_ATTRIBUTES,
     DEFAULT_PASSWORD_POLICY_ATTRIBUTES,
     DEFAULT_PRIVILEGED_GROUPS,
+    DEFAULT_PWD_VIOLATION_ATTRIBUTES,
     get_domain_info,
     get_password_policy,
+    get_password_policy_violations,
     get_privileged_groups,
 )
 from .config import (
@@ -37,7 +39,7 @@ from .config import (
     load_config,
     load_domain_config,
 )
-from .connection import connect
+from .connection import check_connection, connect
 from .exceptions import (
     MsadConfigError,
     MsadConnectionError,
@@ -108,6 +110,7 @@ __all__ = [
     "load_domain_config",
     # connection
     "connect",
+    "check_connection",
     # exceptions
     "MsadError",
     "MsadConfigError",
@@ -139,10 +142,12 @@ __all__ = [
     # audit (read-only)
     "get_domain_info",
     "get_password_policy",
+    "get_password_policy_violations",
     "get_privileged_groups",
     "DEFAULT_DOMAIN_ATTRIBUTES",
     "DEFAULT_PASSWORD_POLICY_ATTRIBUTES",
     "DEFAULT_PRIVILEGED_GROUPS",
+    "DEFAULT_PWD_VIOLATION_ATTRIBUTES",
     # group
     "add_member",
     "remove_member",

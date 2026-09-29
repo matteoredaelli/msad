@@ -80,3 +80,60 @@ def test_get_privileged_groups_with_members(conn, make_entry) -> None:
 
     assert report[0]["member_count"] == 1
     assert report[0]["members"][0]["sAMAccountName"] == "op1"
+
+
+def test_pwd_violations_builds_expired_filter(conn, make_entry) -> None:
+    from msad.audit import DEFAULT_PWD_VIOLATION_ATTRIBUTES, get_password_policy_violations
+
+    # 1) get_password_policy -> policy with a 42-day maxPwdAge (negative FILETIME)
+    conn.queue([make_entry({"maxPwdAge": -36288000000000}, dn="DC=example,DC=com")])
+    # 2) the user search
+    conn.queue([make_entry({"sAMAccountName": "old"}, dn="CN=old,DC=example,DC=com")])
+
+    result = get_password_policy_violations(conn, "DC=example,DC=com")
+
+    f = conn.searches[-1].search_filter
+    assert "(objectClass=user)" in f
+    assert "(objectCategory=person)" in f
+    assert "(pwdLastSet<=" in f
+    assert "(pwdLastSet=0)" in f  # include_never_set defaults True
+    assert "1.2.840.113556.1.4.803:=65536" in f  # excludes DONT_EXPIRE_PASSWORD
+    assert conn.searches[-1].attributes == DEFAULT_PWD_VIOLATION_ATTRIBUTES
+    assert len(result) == 1
+
+
+def test_pwd_violations_exclude_never_set(conn, make_entry) -> None:
+    from msad.audit import get_password_policy_violations
+
+    conn.queue([make_entry({"maxPwdAge": -36288000000000}, dn="DC=example,DC=com")])
+    conn.queue([])
+    get_password_policy_violations(conn, "DC=example,DC=com", include_never_set=False)
+    f = conn.searches[-1].search_filter
+    assert "(pwdLastSet<=" in f
+    assert "(pwdLastSet=0)" not in f
+
+
+def test_pwd_violations_no_policy_returns_empty(conn) -> None:
+    from msad.audit import get_password_policy_violations
+
+    conn.queue([])  # get_password_policy finds nothing
+    assert get_password_policy_violations(conn, "DC=example,DC=com") == []
+
+
+def test_pwd_violations_zero_maxpwdage_returns_empty(conn, make_entry) -> None:
+    from msad.audit import get_password_policy_violations
+
+    # maxPwdAge = 0 -> passwords never expire domain-wide
+    conn.queue([make_entry({"maxPwdAge": 0}, dn="DC=example,DC=com")])
+    assert get_password_policy_violations(conn, "DC=example,DC=com") == []
+
+
+def test_max_pwd_age_span_handles_timedelta() -> None:
+    import datetime
+
+    from msad.audit import _max_pwd_age_filetime_span
+
+    assert _max_pwd_age_filetime_span(datetime.timedelta(days=42)) == 42 * 86400 * 10_000_000
+    assert _max_pwd_age_filetime_span(-36288000000000) == 36288000000000
+    assert _max_pwd_age_filetime_span(0) is None
+    assert _max_pwd_age_filetime_span(None) is None

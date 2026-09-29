@@ -64,3 +64,53 @@ def test_connect_reports_userpwd_auth(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(MsadConnectionError, match="user 'svc'"):
         connection.connect(userpwd)
+
+
+def test_check_connection_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeConn:
+        bound = True
+
+        def bind(self) -> bool:
+            return True
+
+        def unbind(self) -> bool:
+            return True
+
+    monkeypatch.setattr(connection, "_build_connection", lambda config: FakeConn())
+
+    result = connection.check_connection(KRB)
+    assert result["ok"] is True
+    assert result["target"] == "ldaps://dc.example.com:636"
+    assert result["auth"] == "kerberos"
+    assert result["error"] is None
+
+
+def test_check_connection_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(config: DomainConfig):
+        raise LDAPSocketOpenError("invalid server address")
+
+    monkeypatch.setattr(connection, "_build_connection", boom)
+
+    result = connection.check_connection(KRB)
+    assert result["ok"] is False
+    assert "invalid server address" in result["error"]
+    assert result["target"] == "ldaps://dc.example.com:636"
+
+
+def test_check_connection_userpwd_auth(monkeypatch: pytest.MonkeyPatch) -> None:
+    userpwd = DomainConfig(host="dc.example.com", base="dc=x", user="svc", password="p")
+
+    class FakeConn:
+        bound = True
+
+        def bind(self) -> bool:
+            return True
+
+        def unbind(self) -> bool:
+            return True
+
+    monkeypatch.setattr(connection, "_build_connection", lambda config: FakeConn())
+
+    result = connection.check_connection(userpwd)
+    assert result["ok"] is True
+    assert result["auth"] == "user 'svc'"

@@ -161,6 +161,21 @@ def group_members(
 
 @app.command()
 @_handle_errors
+def test_connection(
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+):
+    """Test connectivity and bind to the AD server. Exits non-zero on failure."""
+    config = load_domain_config(domain, config_file)
+    result = msad.check_connection(config)
+    print(_pprint([result], out_format))
+    if not result["ok"]:
+        raise typer.Exit(1)
+
+
+@app.command()
+@_handle_errors
 def search(
     filter: str,
     limit: int = 2000,
@@ -452,6 +467,28 @@ def password_policy(
     config, conn = _connect(domain, config_file)
     result = msad.get_password_policy(conn, config.base)
     print(_pprint([result] if result else [], out_format))
+
+
+@app.command()
+@_handle_errors
+def password_policy_violations(
+    include_never_set: bool = True,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find users whose password violates the domain policy (expired/never set)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.get_password_policy_violations(
+        conn,
+        config.base,
+        include_never_set=include_never_set,
+        limit=limit,
+        attributes=attributes,
+    )
+    print(_pprint(result, out_format))
 
 
 @app.command()

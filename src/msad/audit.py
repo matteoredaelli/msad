@@ -13,6 +13,7 @@ handling, paging and result shape (plain dicts) as the rest of the library.
 
 from __future__ import annotations
 
+import datetime
 import logging
 
 from .group import get_group, group_members
@@ -112,6 +113,95 @@ def get_password_policy(
     return result[0] if result else None
 
 
+# FILETIME epoch offset (seconds between 1601-01-01 and 1970-01-01).
+_FILETIME_EPOCH_OFFSET = 11644473600
+
+#: Attributes returned for each user flagged by a password-policy check.
+DEFAULT_PWD_VIOLATION_ATTRIBUTES = [
+    "sAMAccountName",
+    "cn",
+    "mail",
+    "pwdLastSet",
+    "userAccountControl",
+    "whenCreated",
+    "distinguishedName",
+]
+
+
+def _now_filetime() -> int:
+    """Current time as a Windows FILETIME (100-ns intervals since 1601)."""
+    unix_seconds = datetime.datetime.now(datetime.UTC).timestamp()
+    return int((unix_seconds + _FILETIME_EPOCH_OFFSET) * 10_000_000)
+
+
+def _max_pwd_age_filetime_span(max_pwd_age: object) -> int | None:
+    """Normalize a domain ``maxPwdAge`` value to a positive FILETIME span.
+
+    AD stores ``maxPwdAge`` as a negative FILETIME interval; ldap3 may surface
+    it as a negative int (100-ns units) or a ``timedelta``. Returns the span in
+    100-ns units (positive), or None if passwords never expire (age is 0).
+    """
+    if isinstance(max_pwd_age, datetime.timedelta):
+        span = int(abs(max_pwd_age.total_seconds()) * 10_000_000)
+    elif isinstance(max_pwd_age, int):
+        span = abs(max_pwd_age)
+    else:
+        return None
+    return span or None
+
+
+def get_password_policy_violations(
+    conn: LdapConnection,
+    base: str,
+    *,
+    include_never_set: bool = True,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find enabled users whose password violates the domain password policy.
+
+    A user is flagged when the password is older than the domain ``maxPwdAge``
+    (i.e. it has expired), optionally also when it was never set
+    (``pwdLastSet=0``, meaning the user must change it at next logon). Accounts
+    whose password never expires (``DONT_EXPIRE_PASSWORD``) are excluded, since
+    the age rule does not apply to them.
+
+    Args:
+        base: the domain naming context DN (used to read the policy and as the
+            user search base).
+        include_never_set: also flag users with ``pwdLastSet=0``.
+
+    Returns:
+        A list of flagged user entries. Empty if the policy has no maximum age.
+    """
+    policy = get_password_policy(conn, base)
+    if not policy:
+        logging.debug("password policy not found under %r", base)
+        return []
+
+    span = _max_pwd_age_filetime_span(policy.get("maxPwdAge"))
+    if span is None:
+        # maxPwdAge = 0 -> passwords never expire domain-wide: no age violations.
+        logging.debug("domain maxPwdAge is 0 (passwords never expire)")
+        return []
+
+    cutoff = _now_filetime() - span
+    # DONT_EXPIRE_PASSWORD = 0x10000 (65536); exclude those accounts via a
+    # bitwise-AND matching rule (1.2.840.113556.1.4.803).
+    not_never_expires = "(!(userAccountControl:1.2.840.113556.1.4.803:=65536))"
+    expired = f"(pwdLastSet<={cutoff})"
+    if include_never_set:
+        expired = f"(|{expired}(pwdLastSet=0))"
+    search_filter = f"(&(objectClass=user)(objectCategory=person){not_never_expires}{expired})"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_PWD_VIOLATION_ATTRIBUTES,
+    )
+
+
 def get_privileged_groups(
     conn: LdapConnection,
     base: str,
@@ -154,8 +244,10 @@ __all__ = [
     "DEFAULT_DOMAIN_ATTRIBUTES",
     "DEFAULT_PASSWORD_POLICY_ATTRIBUTES",
     "DEFAULT_PRIVILEGED_GROUPS",
+    "DEFAULT_PWD_VIOLATION_ATTRIBUTES",
     "escape_exact",
     "get_domain_info",
     "get_password_policy",
+    "get_password_policy_violations",
     "get_privileged_groups",
 ]

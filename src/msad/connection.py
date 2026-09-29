@@ -14,7 +14,9 @@ the same typed error handling.
 
 from __future__ import annotations
 
+import logging
 import ssl
+from typing import Any
 
 import ldap3
 from ldap3.core.exceptions import LDAPExceptionError
@@ -70,3 +72,37 @@ def connect(config: DomainConfig) -> LdapConnection:
         raise MsadConnectionError(f"Could not bind to {target} ({auth}): {detail}")
 
     return conn
+
+
+def check_connection(config: DomainConfig) -> dict[str, Any]:
+    """Test connectivity and bind without raising, returning a status dict.
+
+    Useful for health checks and diagnostics: it attempts a full connect/bind
+    and reports the outcome instead of raising.
+
+    Args:
+        config: the resolved domain configuration.
+
+    Returns:
+        A dict with:
+        - ``ok`` (bool): whether the connection and bind succeeded.
+        - ``target`` (str): the server URL, e.g. ``ldaps://dc:636``.
+        - ``auth`` (str): the authentication method used.
+        - ``error`` (str | None): the error message when ``ok`` is False.
+    """
+    auth = "kerberos" if config.uses_kerberos else f"user {config.user!r}"
+    scheme = "ldaps" if config.use_ssl else "ldap"
+    target = f"{scheme}://{config.host}:{config.port}"
+
+    try:
+        conn = connect(config)
+    except MsadConnectionError as exc:
+        return {"ok": False, "target": target, "auth": auth, "error": str(exc)}
+
+    try:
+        conn.unbind()
+    except LDAPExceptionError:
+        # Closing the probe connection is best-effort; ignore teardown errors.
+        logging.debug("unbind after check_connection failed", exc_info=True)
+
+    return {"ok": True, "target": target, "auth": auth, "error": None}
