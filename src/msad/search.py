@@ -47,6 +47,10 @@ DEFAULT_USER_ATTRIBUTES = [
     "lastLogonTimestamp",
     "whenCreated",
     "distinguishedName",
+    "extensionAttribute6",
+    "extensionAttribute7",
+    "extensionAttribute9",
+    "extensionAttribute12",
 ]
 
 #: A sensible default set of group attributes.

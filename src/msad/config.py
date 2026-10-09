@@ -81,7 +81,8 @@ SAMPLE_CONFIG = """\
 # msad configuration file (default location: ~/.msad.toml)
 
 [defaults]
-# Domain used when --domain is not passed on the command line.
+# Domain used when --domain is not passed on the command line (CLI) or when
+# MSAD_DOMAIN is not set (MCP server).
 domain = "mydomain"
 
 [domains.mydomain]
@@ -99,10 +100,16 @@ use_ssl = true
 # user = "svc_account"
 # password = "s3cr3t"
 
-# You can declare more domains and select one with --domain <name>:
-# [domains.otherdomain]
-# host = "dc.other.example.com"
-# base = "dc=other,dc=example,dc=com"
+# Declare as many domains as you need and pick one at runtime with
+# `--domain <name>` (CLI) or the `domain` argument / MSAD_DOMAIN env (MCP).
+# This second domain uses user/password authentication instead of Kerberos:
+[domains.otherdomain]
+host = "dc.other.example.com"
+base = "dc=other,dc=example,dc=com"
+port = 636
+use_ssl = true
+user = "svc_reader"
+password = "s3cr3t"
 """
 
 

@@ -107,6 +107,41 @@ use_ssl = true      # false for plain LDAP
 You can declare multiple domains under `[domains.<name>]` and select one at
 runtime with `--domain <name>`.
 
+### Multiple domains
+
+Declare as many domains as you need; each can use its own authentication
+(Kerberos or user/password). `[defaults].domain` is used when `--domain` is
+not given:
+
+```toml
+[defaults]
+domain = "corp"
+
+# Kerberos (SASL): omit user/password, run `kinit` first.
+[domains.corp]
+host = "dc.corp.example.com"
+base = "dc=corp,dc=example,dc=com"
+port = 636
+use_ssl = true
+
+# A second domain using user/password authentication.
+[domains.lab]
+host = "dc.lab.example.com"
+base = "dc=lab,dc=example,dc=com"
+port = 636
+use_ssl = true
+user = "svc_reader"
+password = "s3cr3t"
+```
+
+Then target a domain per command (defaults to `[defaults].domain` when omitted):
+
+```bash
+msad user-get matteo                 # uses the default domain (corp)
+msad user-get jdoe --domain lab      # runs against the lab domain
+msad test-connection --domain lab    # check connectivity to a specific domain
+```
+
 ## Usage
 
 ```bash
