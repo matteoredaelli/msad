@@ -24,6 +24,7 @@ Features:
 - [X] check whether a user is a (nested) member of a group
 - [X] add/remove members to/from AD groups using DN or sAMAccountName
 - [X] change AD passwords
+- [X] unlock a locked-out user account (reset `lockoutTime` to 0)
 - [X] check if a user is disabled, locked, or has an expired/never-expiring password
 - [X] LDAP filter escaping to prevent injection
 
