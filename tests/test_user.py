@@ -15,6 +15,7 @@ from msad.user import (
     is_disabled,
     is_locked,
     password_changed_in_days,
+    unlock_user,
     user_groups,
 )
 
@@ -96,6 +97,27 @@ def test_change_password_user_not_found_raises(conn) -> None:
     conn.queue([])  # get_dn lookup fails
     with pytest.raises(MsadNotFoundError, match="User not found"):
         change_password(conn, "dc=x", "ghost", "newpwd")
+
+
+def test_unlock_user_calls_modify_with_lockouttime_zero(conn) -> None:
+    from ldap3 import MODIFY_REPLACE
+
+    assert unlock_user(conn, "dc=x", USER_DN) is True
+    assert conn.calls[-1] == ("modify", USER_DN, {"lockoutTime": [(MODIFY_REPLACE, [0])]})
+
+
+def test_unlock_user_resolves_samaccountname(conn) -> None:
+    # get_dn looks up the sAMAccountName -> DN, then modify runs on that DN
+    conn.queue([{"dn": USER_DN, "attributes": {"distinguishedName": USER_DN}}])
+    assert unlock_user(conn, "dc=x", "matteo") is True
+    assert conn.calls[-1][0] == "modify"
+    assert conn.calls[-1][1] == USER_DN
+
+
+def test_unlock_user_not_found_raises(conn) -> None:
+    conn.queue([])  # get_dn lookup fails
+    with pytest.raises(MsadNotFoundError, match="User not found"):
+        unlock_user(conn, "dc=x", "ghost")
 
 
 def test_has_expired_password_false_when_never_expires(conn) -> None:

@@ -21,6 +21,8 @@ import logging
 from collections.abc import Iterator, Sequence
 from typing import Any
 
+from ldap3 import MODIFY_REPLACE
+
 from .exceptions import MsadNotFoundError
 from .group import is_member
 from .search import (
@@ -62,6 +64,31 @@ def change_password(
         raise MsadNotFoundError(f"User not found: {user}")
 
     return conn.extend.microsoft.modify_password(user_dn, new_password, old_password)
+
+
+def unlock_user(conn: LdapConnection, base: str, user: str) -> bool:
+    """Unlock a locked-out user account by resetting ``lockoutTime`` to 0.
+
+    Setting ``lockoutTime`` to 0 is the standard way to clear an Active
+    Directory lockout. This is a no-op (still returns True) if the account is
+    not currently locked.
+
+    Args:
+        conn: a bound ldap3 connection.
+        base: the AD search base.
+        user: sAMAccountName or DN of the user.
+
+    Returns:
+        True if the modify operation succeeded.
+
+    Raises:
+        MsadNotFoundError: if the user cannot be resolved to a DN.
+    """
+    user_dn = get_dn(conn, base, user)
+    if not user_dn:
+        raise MsadNotFoundError(f"User not found: {user}")
+
+    return conn.modify(user_dn, {"lockoutTime": [(MODIFY_REPLACE, [0])]})
 
 
 def is_disabled(conn: LdapConnection, base: str, user: str) -> bool | None:

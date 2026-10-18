@@ -89,6 +89,7 @@ from .user import (
     is_disabled,
     is_locked,
     password_changed_in_days,
+    unlock_user,
     user_groups,
 )
 
@@ -166,5 +167,6 @@ __all__ = [
     "has_expired_password",
     "has_never_expires_password",
     "password_changed_in_days",
+    "unlock_user",
     "user_groups",
 ]

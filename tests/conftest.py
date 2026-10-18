@@ -91,6 +91,13 @@ class FakeConnection:
     def __post_init__(self) -> None:
         self.extend = _Extend(self)
 
+    # --- ldap3.Connection surface used by write helpers ----------------
+
+    def modify(self, dn: str, changes: dict[str, Any]) -> bool:
+        """Record a standard modify call (used by unlock_user) and succeed."""
+        self.calls.append(("modify", dn, changes))
+        return True
+
     # --- helpers for tests ---------------------------------------------
 
     def queue(self, *responses: list[dict[str, Any]]) -> None:
