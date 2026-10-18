@@ -16,6 +16,8 @@ Features:
 - [X] find inactive users / stale computers (last logon older than N days)
 - [X] audit reads: domain info, default password policy, privileged groups
 - [X] audit reads: FSMO role owners, domain trusts, AD sites
+- [X] audit reads: GPOs, fine-grained password policies (PSOs)
+- [X] list domain controllers, empty groups, and computers grouped by OS
 - [X] find users whose password violates the domain policy
 - [X] test AD connectivity (health check)
 - [X] get a single user or group

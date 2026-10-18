@@ -579,3 +579,88 @@ def locked_users(
     """Search locked-out user accounts (lockoutTime >= 1)."""
     search_filter = f"(&(objectCategory=Person)(objectClass=User){extra_filter}(lockoutTime>=1))"
     return search(conn, base, search_filter, attributes=attributes)
+
+
+def list_domain_controllers(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """List the domain controllers (computer accounts that are DCs).
+
+    Matches computer objects with the ``SERVER_TRUST_ACCOUNT`` userAccountControl
+    flag (0x2000 = 8192), which is set on domain controllers.
+
+    Returns:
+        A list of DC computer entries (default computer attributes if none given).
+    """
+    search_filter = "(&(objectClass=computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_COMPUTER_ATTRIBUTES,
+    )
+
+
+def list_empty_groups(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """List groups that have no direct members (``(!(member=*))``).
+
+    A common hygiene/audit check. Note that a group with only *nested* members
+    via ``memberOf`` elsewhere still counts as empty here if its own ``member``
+    attribute is unset.
+
+    Returns:
+        A list of empty-group entries (default group attributes if none given).
+    """
+    search_filter = "(&(objectClass=group)(!(member=*)))"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_GROUP_ATTRIBUTES,
+    )
+
+
+def summarize_computer_os(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+) -> list[dict[str, object]]:
+    """Summarize computer accounts grouped by ``operatingSystem``.
+
+    Reads every computer's ``operatingSystem`` and counts them in-process.
+
+    Returns:
+        A list of ``{"operatingSystem": <name>, "count": <n>}`` dicts, sorted by
+        descending count. Computers with no ``operatingSystem`` are reported
+        under the name ``"(unknown)"``.
+    """
+    entries = search(
+        conn,
+        base,
+        "(objectClass=computer)",
+        limit=limit,
+        attributes=["operatingSystem"],
+    )
+    counts: dict[str, int] = {}
+    for entry in entries:
+        os_value = entry.get("operatingSystem") or "(unknown)"
+        if isinstance(os_value, list):
+            os_value = os_value[0] if os_value else "(unknown)"
+        counts[os_value] = counts.get(os_value, 0) + 1
+    return [
+        {"operatingSystem": name, "count": count}
+        for name, count in sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
+    ]

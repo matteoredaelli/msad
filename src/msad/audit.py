@@ -382,20 +382,145 @@ def list_sites(
         return []
 
 
+#: Attributes worth surfacing for each Group Policy Object.
+DEFAULT_GPO_ATTRIBUTES = [
+    "cn",
+    "displayName",
+    "gPCFileSysPath",
+    "versionNumber",
+    "flags",
+    "whenCreated",
+    "whenChanged",
+    "distinguishedName",
+]
+
+
+def list_gpos(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """List Group Policy Objects (``groupPolicyContainer``).
+
+    GPOs live under ``CN=Policies,CN=System,<base>``. Each GPO's ``cn`` is its
+    GUID; ``displayName`` is the friendly name.
+
+    Returns:
+        A list of GPO entries (default attributes if none given). Empty if the
+        Policies container cannot be read.
+    """
+    policies = f"CN=Policies,CN=System,{base}"
+    try:
+        return search(
+            conn,
+            policies,
+            "(objectClass=groupPolicyContainer)",
+            limit=limit,
+            attributes=attributes or DEFAULT_GPO_ATTRIBUTES,
+        )
+    except LDAPExceptionError as exc:
+        logging.debug("list_gpos: cannot read %r: %s", policies, exc)
+        return []
+
+
+def get_gpo(
+    conn: LdapConnection,
+    base: str,
+    identifier: str,
+    attributes: Attributes = None,
+) -> LdapEntry | None:
+    """Return a single GPO matched by its ``cn`` (GUID) or ``displayName``.
+
+    The GUID may be given with or without surrounding braces. Returns the first
+    match, or None if no GPO is found.
+    """
+    value = escape_exact(identifier)
+    braced = value if value.startswith("{") else f"{{{value}}}"
+    policies = f"CN=Policies,CN=System,{base}"
+    search_filter = (
+        f"(&(objectClass=groupPolicyContainer)(|(cn={value})(cn={braced})(displayName={value})))"
+    )
+    try:
+        result = search(
+            conn,
+            policies,
+            search_filter,
+            limit=1,
+            attributes=attributes or DEFAULT_GPO_ATTRIBUTES,
+        )
+    except LDAPExceptionError as exc:
+        logging.debug("get_gpo(%r): cannot read %r: %s", identifier, policies, exc)
+        return None
+    return result[0] if result else None
+
+
+#: Attributes worth surfacing for each fine-grained password policy (PSO).
+DEFAULT_PSO_ATTRIBUTES = [
+    "cn",
+    "msDS-PasswordSettingsPrecedence",
+    "msDS-MinimumPasswordLength",
+    "msDS-PasswordHistoryLength",
+    "msDS-MaximumPasswordAge",
+    "msDS-MinimumPasswordAge",
+    "msDS-LockoutThreshold",
+    "msDS-LockoutDuration",
+    "msDS-PasswordComplexityEnabled",
+    "msDS-PSOAppliesTo",
+    "distinguishedName",
+]
+
+
+def list_fine_grained_password_policies(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """List fine-grained password policies (PSOs, ``msDS-PasswordSettings``).
+
+    PSOs live under ``CN=Password Settings Container,CN=System,<base>``. Reading
+    their contents may require extra directory rights; when the container is not
+    readable an empty list is returned.
+
+    Returns:
+        A list of PSO entries (default attributes if none given).
+    """
+    container = f"CN=Password Settings Container,CN=System,{base}"
+    try:
+        return search(
+            conn,
+            container,
+            "(objectClass=msDS-PasswordSettings)",
+            limit=limit,
+            attributes=attributes or DEFAULT_PSO_ATTRIBUTES,
+        )
+    except LDAPExceptionError as exc:
+        logging.debug("list_fine_grained_password_policies: cannot read %r: %s", container, exc)
+        return []
+
+
 # escape_exact is re-exported for callers that build their own audit filters.
 __all__ = [
     "DEFAULT_DOMAIN_ATTRIBUTES",
+    "DEFAULT_GPO_ATTRIBUTES",
     "DEFAULT_PASSWORD_POLICY_ATTRIBUTES",
     "DEFAULT_PRIVILEGED_GROUPS",
+    "DEFAULT_PSO_ATTRIBUTES",
     "DEFAULT_PWD_VIOLATION_ATTRIBUTES",
     "DEFAULT_SITE_ATTRIBUTES",
     "DEFAULT_TRUST_ATTRIBUTES",
     "escape_exact",
     "get_domain_info",
+    "get_gpo",
     "get_password_policy",
     "get_password_policy_violations",
     "get_privileged_groups",
+    "list_fine_grained_password_policies",
     "list_fsmo_roles",
+    "list_gpos",
     "list_sites",
     "list_trusts",
 ]

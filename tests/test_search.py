@@ -329,3 +329,55 @@ def test_find_stale_computers_include_never(conn) -> None:
     find_stale_computers(conn, "dc=x", days=90, include_never=True)
     f = conn.searches[-1].search_filter
     assert "(!(lastLogonTimestamp=*))" in f
+
+
+def test_list_domain_controllers_filter(conn, make_entry) -> None:
+    from msad.search import DEFAULT_COMPUTER_ATTRIBUTES, list_domain_controllers
+
+    conn.queue([make_entry({"cn": "DC1"}, dn="CN=DC1,OU=Domain Controllers,dc=x")])
+    result = list_domain_controllers(conn, "dc=x")
+    f = conn.searches[-1].search_filter
+    assert "(objectClass=computer)" in f
+    assert "1.2.840.113556.1.4.803:=8192" in f  # SERVER_TRUST_ACCOUNT
+    assert conn.searches[-1].attributes == DEFAULT_COMPUTER_ATTRIBUTES
+    assert result[0]["cn"] == "DC1"
+
+
+def test_list_empty_groups_filter(conn, make_entry) -> None:
+    from msad.search import DEFAULT_GROUP_ATTRIBUTES, list_empty_groups
+
+    conn.queue([make_entry({"cn": "Orphans"}, dn="CN=Orphans,dc=x")])
+    result = list_empty_groups(conn, "dc=x")
+    f = conn.searches[-1].search_filter
+    assert "(objectClass=group)" in f
+    assert "(!(member=*))" in f
+    assert conn.searches[-1].attributes == DEFAULT_GROUP_ATTRIBUTES
+    assert result[0]["cn"] == "Orphans"
+
+
+def test_summarize_computer_os_counts_and_sorts(conn, make_entry) -> None:
+    from msad.search import summarize_computer_os
+
+    conn.queue(
+        [
+            make_entry({"operatingSystem": "Windows Server 2019"}, dn="CN=a,dc=x"),
+            make_entry({"operatingSystem": "Windows Server 2019"}, dn="CN=b,dc=x"),
+            make_entry({"operatingSystem": "Windows 10"}, dn="CN=c,dc=x"),
+            make_entry({}, dn="CN=d,dc=x"),  # no operatingSystem -> (unknown)
+        ]
+    )
+    summary = summarize_computer_os(conn, "dc=x")
+    assert conn.searches[-1].search_filter == "(objectClass=computer)"
+    assert conn.searches[-1].attributes == ["operatingSystem"]
+    # Sorted by descending count; 2019 (2) first.
+    assert summary[0] == {"operatingSystem": "Windows Server 2019", "count": 2}
+    names = {row["operatingSystem"]: row["count"] for row in summary}
+    assert names["Windows 10"] == 1
+    assert names["(unknown)"] == 1
+
+
+def test_summarize_computer_os_empty(conn) -> None:
+    from msad.search import summarize_computer_os
+
+    conn.queue([])
+    assert summarize_computer_os(conn, "dc=x") == []

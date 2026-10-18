@@ -236,3 +236,57 @@ def test_list_sites_respects_config_base(conn) -> None:
     conn.queue([])
     list_sites(conn, "DC=child,DC=example,DC=com", config_base="CN=Configuration,DC=example,DC=com")
     assert conn.searches[-1].search_base == "CN=Sites,CN=Configuration,DC=example,DC=com"
+
+
+# --- GPOs -------------------------------------------------------------------
+
+
+def test_list_gpos_filter_and_base(conn, make_entry) -> None:
+    from msad.audit import DEFAULT_GPO_ATTRIBUTES, list_gpos
+
+    conn.queue([make_entry({"displayName": "Default Domain Policy"}, dn="CN={GUID},CN=Policies")])
+    result = list_gpos(conn, "DC=example,DC=com")
+    last = conn.searches[-1]
+    assert last.search_base == "CN=Policies,CN=System,DC=example,DC=com"
+    assert last.search_filter == "(objectClass=groupPolicyContainer)"
+    assert last.attributes == DEFAULT_GPO_ATTRIBUTES
+    assert result[0]["displayName"] == "Default Domain Policy"
+
+
+def test_get_gpo_matches_cn_braced_and_displayname(conn, make_entry) -> None:
+    from msad.audit import get_gpo
+
+    conn.queue(
+        [make_entry({"cn": "{31B2F340-016D-11D2-945F-00C04FB984F9}"}, dn="CN=...,CN=Policies")]
+    )
+    result = get_gpo(conn, "DC=example,DC=com", "31B2F340-016D-11D2-945F-00C04FB984F9")
+    f = conn.searches[-1].search_filter
+    assert "(objectClass=groupPolicyContainer)" in f
+    assert "(cn=31B2F340-016D-11D2-945F-00C04FB984F9)" in f
+    assert "(cn={31B2F340-016D-11D2-945F-00C04FB984F9})" in f  # braces tried too
+    assert "(displayName=31B2F340-016D-11D2-945F-00C04FB984F9)" in f
+    assert result is not None
+
+
+def test_get_gpo_returns_none_when_absent(conn) -> None:
+    from msad.audit import get_gpo
+
+    conn.queue([])
+    assert get_gpo(conn, "DC=example,DC=com", "Nonexistent") is None
+
+
+# --- Fine-grained password policies (PSOs) ----------------------------------
+
+
+def test_list_psos_filter_and_base(conn, make_entry) -> None:
+    from msad.audit import DEFAULT_PSO_ATTRIBUTES, list_fine_grained_password_policies
+
+    conn.queue(
+        [make_entry({"cn": "PSO-Admins"}, dn="CN=PSO-Admins,CN=Password Settings Container")]
+    )
+    result = list_fine_grained_password_policies(conn, "DC=example,DC=com")
+    last = conn.searches[-1]
+    assert last.search_base == "CN=Password Settings Container,CN=System,DC=example,DC=com"
+    assert last.search_filter == "(objectClass=msDS-PasswordSettings)"
+    assert last.attributes == DEFAULT_PSO_ATTRIBUTES
+    assert result[0]["cn"] == "PSO-Admins"
