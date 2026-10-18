@@ -26,6 +26,7 @@ Features:
 - [X] change AD passwords
 - [X] unlock a locked-out user account (reset `lockoutTime` to 0)
 - [X] check if a user is disabled, locked, or has an expired/never-expiring password
+- [X] decode raw AD attributes (userAccountControl, groupType, FILETIME, SID, GUID)
 - [X] LDAP filter escaping to prevent injection
 
 By default, user lookups return a useful attribute set — identity fields plus

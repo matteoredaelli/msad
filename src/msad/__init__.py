@@ -40,6 +40,15 @@ from .config import (
     load_domain_config,
 )
 from .connection import check_connection, connect
+from .decode import (
+    decode_entries,
+    decode_entry,
+    decode_filetime,
+    decode_group_type,
+    decode_guid,
+    decode_sid,
+    decode_user_account_control,
+)
 from .exceptions import (
     MsadConfigError,
     MsadConnectionError,
@@ -112,6 +121,14 @@ __all__ = [
     # connection
     "connect",
     "check_connection",
+    # decode (pure attribute decoders)
+    "decode_entry",
+    "decode_entries",
+    "decode_user_account_control",
+    "decode_group_type",
+    "decode_filetime",
+    "decode_sid",
+    "decode_guid",
     # exceptions
     "MsadError",
     "MsadConfigError",
