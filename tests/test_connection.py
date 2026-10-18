@@ -114,3 +114,38 @@ def test_check_connection_userpwd_auth(monkeypatch: pytest.MonkeyPatch) -> None:
     result = connection.check_connection(userpwd)
     assert result["ok"] is True
     assert result["auth"] == "user 'svc'"
+
+
+def _capture_connection_kwargs(monkeypatch: pytest.MonkeyPatch) -> dict:
+    """Patch ldap3.Connection/Server/Tls to capture the Connection kwargs."""
+    captured: dict = {}
+
+    def fake_connection(server, **kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(connection.ldap3, "Connection", fake_connection)
+    monkeypatch.setattr(connection.ldap3, "Server", lambda *a, **k: object())
+    monkeypatch.setattr(connection.ldap3, "Tls", lambda *a, **k: object())
+    return captured
+
+
+def test_build_connection_passes_query_timeout_kerberos(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured = _capture_connection_kwargs(monkeypatch)
+    cfg = DomainConfig(host="dc", base="dc=x", use_ssl=True, query_timeout=30)
+    connection._build_connection(cfg)
+    assert captured["receive_timeout"] == 30
+
+
+def test_build_connection_passes_query_timeout_userpwd(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured = _capture_connection_kwargs(monkeypatch)
+    cfg = DomainConfig(host="dc", base="dc=x", user="svc", password="p", query_timeout=15)
+    connection._build_connection(cfg)
+    assert captured["receive_timeout"] == 15
+
+
+def test_build_connection_timeout_defaults_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured = _capture_connection_kwargs(monkeypatch)
+    cfg = DomainConfig(host="dc", base="dc=x", user="svc", password="p")
+    connection._build_connection(cfg)
+    assert captured["receive_timeout"] is None

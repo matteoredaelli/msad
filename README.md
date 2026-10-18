@@ -15,6 +15,7 @@ Features:
 - [X] search organizational units (OUs) and list their contents
 - [X] find inactive users / stale computers (last logon older than N days)
 - [X] audit reads: domain info, default password policy, privileged groups
+- [X] audit reads: FSMO role owners, domain trusts, AD sites
 - [X] find users whose password violates the domain policy
 - [X] test AD connectivity (health check)
 - [X] get a single user or group
@@ -99,6 +100,10 @@ host = "dc.example.com"
 base = "dc=example,dc=com"
 port = 636          # 389 for plain LDAP
 use_ssl = true      # false for plain LDAP
+
+# Optional: abort an LDAP operation that gets no response within N seconds
+# (ldap3 receive_timeout). Omit to keep ldap3's default (no timeout).
+# query_timeout = 30
 
 # Omit user/password to authenticate with Kerberos (SASL); get a ticket
 # first with `kinit`. Set BOTH to authenticate with user/password:

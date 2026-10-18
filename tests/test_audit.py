@@ -137,3 +137,102 @@ def test_max_pwd_age_span_handles_timedelta() -> None:
     assert _max_pwd_age_filetime_span(-36288000000000) == 36288000000000
     assert _max_pwd_age_filetime_span(0) is None
     assert _max_pwd_age_filetime_span(None) is None
+
+
+# --- FSMO roles -------------------------------------------------------------
+
+
+def test_list_fsmo_roles_queries_five_containers(conn, make_entry) -> None:
+    from msad.audit import list_fsmo_roles
+
+    base = "DC=example,DC=com"
+    dsa = "CN=NTDS Settings,CN=DC1,CN=Servers,CN=Default-First-Site"
+    # One queued response per role container, in the order the function queries.
+    for _ in range(5):
+        conn.queue([make_entry({"fSMORoleOwner": dsa}, dn="x")])
+
+    report = list_fsmo_roles(conn, base)
+
+    roles = [r["role"] for r in report]
+    assert roles == [
+        "schema_master",
+        "domain_naming_master",
+        "pdc_emulator",
+        "rid_master",
+        "infrastructure_master",
+    ]
+    # Schema/Partitions resolve against the Configuration NC; domain roles against base.
+    bases = [s.search_base for s in conn.searches]
+    assert "CN=Schema,CN=Configuration,DC=example,DC=com" in bases
+    assert "CN=Partitions,CN=Configuration,DC=example,DC=com" in bases
+    assert base in bases
+    assert "CN=RID Manager$,CN=System,DC=example,DC=com" in bases
+    assert all(r["owner"] == dsa for r in report)
+
+
+def test_list_fsmo_roles_unwraps_list_owner(conn, make_entry) -> None:
+    from msad.audit import list_fsmo_roles
+
+    # ldap3 may return fSMORoleOwner as a single-item list.
+    conn.queue([make_entry({"fSMORoleOwner": ["CN=dsa"]}, dn="x")])
+    for _ in range(4):
+        conn.queue([])
+    report = list_fsmo_roles(conn, "DC=example,DC=com")
+    assert report[0]["owner"] == "CN=dsa"
+
+
+def test_list_fsmo_roles_respects_config_base(conn, make_entry) -> None:
+    from msad.audit import list_fsmo_roles
+
+    for _ in range(5):
+        conn.queue([make_entry({"fSMORoleOwner": "CN=dsa"}, dn="x")])
+    list_fsmo_roles(
+        conn, "DC=child,DC=example,DC=com", config_base="CN=Configuration,DC=example,DC=com"
+    )
+    bases = [s.search_base for s in conn.searches]
+    assert "CN=Schema,CN=Configuration,DC=example,DC=com" in bases
+
+
+# --- Trusts -----------------------------------------------------------------
+
+
+def test_list_trusts_filter_and_base(conn, make_entry) -> None:
+    from msad.audit import DEFAULT_TRUST_ATTRIBUTES, list_trusts
+
+    conn.queue([make_entry({"trustPartner": "other.example.com"}, dn="CN=other,CN=System,DC=x")])
+    result = list_trusts(conn, "DC=example,DC=com")
+    last = conn.searches[-1]
+    assert last.search_base == "CN=System,DC=example,DC=com"
+    assert last.search_filter == "(objectClass=trustedDomain)"
+    assert last.attributes == DEFAULT_TRUST_ATTRIBUTES
+    assert result[0]["trustPartner"] == "other.example.com"
+
+
+def test_list_trusts_empty(conn) -> None:
+    from msad.audit import list_trusts
+
+    conn.queue([])
+    assert list_trusts(conn, "DC=example,DC=com") == []
+
+
+# --- Sites ------------------------------------------------------------------
+
+
+def test_list_sites_filter_and_base(conn, make_entry) -> None:
+    from msad.audit import DEFAULT_SITE_ATTRIBUTES, list_sites
+
+    conn.queue([make_entry({"cn": "Default-First-Site-Name"}, dn="CN=...,CN=Sites")])
+    result = list_sites(conn, "DC=example,DC=com")
+    last = conn.searches[-1]
+    assert last.search_base == "CN=Sites,CN=Configuration,DC=example,DC=com"
+    assert last.search_filter == "(objectClass=site)"
+    assert last.attributes == DEFAULT_SITE_ATTRIBUTES
+    assert result[0]["cn"] == "Default-First-Site-Name"
+
+
+def test_list_sites_respects_config_base(conn) -> None:
+    from msad.audit import list_sites
+
+    conn.queue([])
+    list_sites(conn, "DC=child,DC=example,DC=com", config_base="CN=Configuration,DC=example,DC=com")
+    assert conn.searches[-1].search_base == "CN=Sites,CN=Configuration,DC=example,DC=com"

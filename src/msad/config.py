@@ -40,6 +40,7 @@ class DomainConfig(BaseModel):
     use_ssl: bool = False
     user: str | None = None
     password: str | None = None
+    query_timeout: int | None = None
 
     @property
     def uses_kerberos(self) -> bool:
@@ -92,6 +93,10 @@ base = "dc=example,dc=com"
 # LDAPS (recommended). For plain LDAP use port 389 and use_ssl = false.
 port = 636
 use_ssl = true
+
+# Optional: abort an LDAP operation that gets no response within N seconds
+# (ldap3 receive_timeout). Omit to keep ldap3's default (no timeout).
+# query_timeout = 30
 
 # Authentication:
 #   - Omit both user and password to authenticate with Kerberos (SASL).

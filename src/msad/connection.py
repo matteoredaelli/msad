@@ -28,6 +28,8 @@ from .types import LdapConnection
 
 def _build_connection(config: DomainConfig) -> LdapConnection:
     """Create an (unbound) ldap3 Connection from a domain config."""
+    # Per-operation receive timeout (seconds); None leaves ldap3's default.
+    timeout = config.query_timeout
     if config.uses_kerberos:
         tls = ldap3.Tls(validate=ssl.CERT_NONE, version=ssl.PROTOCOL_TLSv1_2)
         server = ldap3.Server(config.host, port=config.port, use_ssl=config.use_ssl, tls=tls)
@@ -36,11 +38,18 @@ def _build_connection(config: DomainConfig) -> LdapConnection:
             authentication=ldap3.SASL,
             sasl_mechanism=ldap3.KERBEROS,
             auto_bind=False,
+            receive_timeout=timeout,
         )
 
     # user/password bind (both guaranteed present when uses_kerberos is False)
     server = ldap3.Server(config.host, port=config.port, use_ssl=config.use_ssl)
-    return ldap3.Connection(server, user=config.user, password=config.password, auto_bind=False)
+    return ldap3.Connection(
+        server,
+        user=config.user,
+        password=config.password,
+        auto_bind=False,
+        receive_timeout=timeout,
+    )
 
 
 def connect(config: DomainConfig) -> LdapConnection:

@@ -118,3 +118,22 @@ def test_sample_config_is_valid(tmp_path: Path) -> None:
     assert d.base
     # Sample ships with Kerberos auth (user/password commented out).
     assert d.uses_kerberos is True
+
+
+def test_query_timeout_defaults_to_none() -> None:
+    d = DomainConfig(host="h", base="dc=x")
+    assert d.query_timeout is None
+
+
+def test_query_timeout_parsed_from_toml(tmp_path: Path) -> None:
+    content = """
+[defaults]
+domain = "d1"
+
+[domains.d1]
+host = "dc1.example.com"
+base = "dc=example,dc=com"
+query_timeout = 30
+"""
+    cfg = load_config(_write(tmp_path, content))
+    assert cfg.get_domain("d1").query_timeout == 30

@@ -16,6 +16,8 @@ from __future__ import annotations
 import datetime
 import logging
 
+from ldap3.core.exceptions import LDAPExceptionError
+
 from .group import get_group, group_members
 from .search import escape_exact, search
 from .types import Attributes, LdapConnection, LdapEntries, LdapEntry
@@ -239,15 +241,161 @@ def get_privileged_groups(
     return report
 
 
+def _configuration_nc(base: str) -> str:
+    """Return the Configuration naming context DN for a domain base.
+
+    For a single-domain forest the forest root equals the domain base, so the
+    Configuration NC is ``CN=Configuration,<base>``. In a multi-domain forest
+    pass an explicit ``config_base`` to the callers below.
+    """
+    return f"CN=Configuration,{base}"
+
+
+#: The five FSMO roles and the well-known container (relative to the domain
+#: base or the Configuration NC) whose ``fSMORoleOwner`` names the role holder.
+_FSMO_ROLES = [
+    ("schema_master", "CN=Schema,{config}"),
+    ("domain_naming_master", "CN=Partitions,{config}"),
+    ("pdc_emulator", "{base}"),
+    ("rid_master", "CN=RID Manager$,CN=System,{base}"),
+    ("infrastructure_master", "CN=Infrastructure,{base}"),
+]
+
+
+def list_fsmo_roles(
+    conn: LdapConnection,
+    base: str,
+    *,
+    config_base: str | None = None,
+) -> LdapEntries:
+    """Report the owner (``fSMORoleOwner``) of each of the five FSMO roles.
+
+    The schema and domain-naming masters live in the Configuration naming
+    context; the other three are domain-scoped. For a single-domain forest the
+    Configuration NC is derived from ``base``; pass ``config_base`` explicitly
+    for a multi-domain forest.
+
+    Returns:
+        One entry per role that could be read, each a dict with ``role``,
+        ``container`` (the DN queried) and ``owner`` (the owning DSA DN, or
+        None if the attribute was absent). A container that cannot be read is
+        skipped (logged at debug level).
+    """
+    config = config_base or _configuration_nc(base)
+    report: LdapEntries = []
+    for role, template in _FSMO_ROLES:
+        container = template.format(base=base, config=config)
+        try:
+            result = search(
+                conn, container, "(objectClass=*)", limit=1, attributes=["fSMORoleOwner"]
+            )
+        except LDAPExceptionError as exc:
+            logging.debug("FSMO role %s: cannot read %r: %s", role, container, exc)
+            continue
+        if not result:
+            continue
+        owner = result[0].get("fSMORoleOwner")
+        if isinstance(owner, list):
+            owner = owner[0] if owner else None
+        report.append({"role": role, "container": container, "owner": owner})
+    return report
+
+
+#: Attributes worth surfacing for each trust relationship.
+DEFAULT_TRUST_ATTRIBUTES = [
+    "trustPartner",
+    "flatName",
+    "trustDirection",
+    "trustType",
+    "trustAttributes",
+    "whenCreated",
+    "distinguishedName",
+]
+
+
+def list_trusts(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """List the domain's trust relationships (``objectClass=trustedDomain``).
+
+    Trust objects live under ``CN=System,<base>``.
+
+    Returns:
+        A list of trust entries (default attributes if none given).
+    """
+    system = f"CN=System,{base}"
+    try:
+        return search(
+            conn,
+            system,
+            "(objectClass=trustedDomain)",
+            limit=limit,
+            attributes=attributes or DEFAULT_TRUST_ATTRIBUTES,
+        )
+    except LDAPExceptionError as exc:
+        logging.debug("list_trusts: cannot read %r: %s", system, exc)
+        return []
+
+
+#: Attributes worth surfacing for each AD site.
+DEFAULT_SITE_ATTRIBUTES = [
+    "cn",
+    "description",
+    "whenCreated",
+    "distinguishedName",
+]
+
+
+def list_sites(
+    conn: LdapConnection,
+    base: str,
+    *,
+    config_base: str | None = None,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """List the AD sites (``objectClass=site``) from the Configuration NC.
+
+    Sites live under ``CN=Sites,CN=Configuration,<forest root>``. For a
+    single-domain forest the Configuration NC is derived from ``base``; pass
+    ``config_base`` explicitly for a multi-domain forest.
+
+    Returns:
+        A list of site entries (default attributes if none given).
+    """
+    config = config_base or _configuration_nc(base)
+    sites = f"CN=Sites,{config}"
+    try:
+        return search(
+            conn,
+            sites,
+            "(objectClass=site)",
+            limit=limit,
+            attributes=attributes or DEFAULT_SITE_ATTRIBUTES,
+        )
+    except LDAPExceptionError as exc:
+        logging.debug("list_sites: cannot read %r: %s", sites, exc)
+        return []
+
+
 # escape_exact is re-exported for callers that build their own audit filters.
 __all__ = [
     "DEFAULT_DOMAIN_ATTRIBUTES",
     "DEFAULT_PASSWORD_POLICY_ATTRIBUTES",
     "DEFAULT_PRIVILEGED_GROUPS",
     "DEFAULT_PWD_VIOLATION_ATTRIBUTES",
+    "DEFAULT_SITE_ATTRIBUTES",
+    "DEFAULT_TRUST_ATTRIBUTES",
     "escape_exact",
     "get_domain_info",
     "get_password_policy",
     "get_password_policy_violations",
     "get_privileged_groups",
+    "list_fsmo_roles",
+    "list_sites",
+    "list_trusts",
 ]
