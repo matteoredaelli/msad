@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from ldap3.core.exceptions import LDAPSocketOpenError
 
@@ -116,9 +118,9 @@ def test_check_connection_userpwd_auth(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result["auth"] == "user 'svc'"
 
 
-def _capture_connection_kwargs(monkeypatch: pytest.MonkeyPatch) -> dict:
+def _capture_connection_kwargs(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     """Patch ldap3.Connection/Server/Tls to capture the Connection kwargs."""
-    captured: dict = {}
+    captured: dict[str, Any] = {}
 
     def fake_connection(server, **kwargs):
         captured.update(kwargs)

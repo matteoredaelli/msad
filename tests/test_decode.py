@@ -39,7 +39,9 @@ def test_uac_disabled_and_never_expires() -> None:
 
 
 def test_uac_accepts_numeric_string() -> None:
-    assert decode_user_account_control("514")["disabled"] is True
+    d = decode_user_account_control("514")
+    assert d is not None
+    assert d["disabled"] is True
 
 
 def test_uac_rejects_non_numeric() -> None:
@@ -73,7 +75,9 @@ def test_group_type_universal_distribution() -> None:
 
 
 def test_group_type_domain_local() -> None:
-    assert decode_group_type(4)["scope"] == "domain_local"
+    d = decode_group_type(4)
+    assert d is not None
+    assert d["scope"] == "domain_local"
 
 
 def test_group_type_rejects_non_numeric() -> None:
