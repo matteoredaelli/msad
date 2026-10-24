@@ -300,7 +300,7 @@ Most commands accept `--out-format`:
 ## Projects using msad
 
 `msad` ships type hints and a stable public API (`msad.__all__`), so it can be
-embedded in other tools. Two front ends build on it:
+embedded in other tools. Three front ends build on it:
 
 - **[mcpAD](https://pypi.org/project/mcpad/)** — a [FastMCP](https://github.com/jlowin/fastmcp)
   server that exposes `msad` as **read-only MCP tools** (search users / groups /
@@ -316,8 +316,15 @@ embedded in other tools. Two front ends build on it:
   environment overrides. Install with `pip install restad` or run with
   `uvx restad`.
 
-Both are read-only: no write operation of `msad` (add/remove member, change
-password, unlock account) is reachable through them.
+- **[graphqlAD](https://pypi.org/project/graphqlad/)** — a **read-only GraphQL
+  interface** over `msad`, built with Strawberry + FastAPI. It exposes the same
+  search and audit operations as a single GraphQL `Query` type (no mutations),
+  with an in-browser GraphiQL IDE at `/graphql`, resolving the connection from
+  the `msad` TOML file plus `MSAD_*` environment overrides. Install with
+  `pip install graphqlad` or run with `uvx graphqlad`.
+
+All three are read-only: no write operation of `msad` (add/remove member,
+change password, unlock account) is reachable through them.
 
 ## Development
 
