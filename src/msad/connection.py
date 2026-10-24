@@ -31,7 +31,12 @@ def _build_connection(config: DomainConfig) -> LdapConnection:
     # Per-operation receive timeout (seconds); None leaves ldap3's default.
     timeout = config.query_timeout
     if config.uses_kerberos:
-        tls = ldap3.Tls(validate=ssl.CERT_NONE, version=ssl.PROTOCOL_TLSv1_2)
+        # ``ssl.PROTOCOL_TLSv1_2`` was deprecated in Python 3.10 and removed in
+        # 3.14. ``PROTOCOL_TLS_CLIENT`` is the modern replacement: it negotiates
+        # the highest protocol both ends support while keeping TLS 1.2 as the
+        # effective floor (older protocols are disabled by default), which
+        # preserves the original intent across Python 3.11 - 3.14.
+        tls = ldap3.Tls(validate=ssl.CERT_NONE, version=ssl.PROTOCOL_TLS_CLIENT)
         server = ldap3.Server(config.host, port=config.port, use_ssl=config.use_ssl, tls=tls)
         return ldap3.Connection(
             server,
