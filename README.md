@@ -297,6 +297,28 @@ Most commands accept `--out-format`:
 - `json`: a single JSON array
 - `csv`: tab-separated, list values joined with `|`
 
+## Projects using msad
+
+`msad` ships type hints and a stable public API (`msad.__all__`), so it can be
+embedded in other tools. Two front ends build on it:
+
+- **[mcpAD](https://pypi.org/project/mcpad/)** — a [FastMCP](https://github.com/jlowin/fastmcp)
+  server that exposes `msad` as **read-only MCP tools** (search users / groups /
+  computers / OUs, memberships, account status, audit reads) for use by AI
+  agents and LLM clients. It reuses the `msad` TOML configuration and opens a
+  short-lived connection per tool call. Install with `pip install mcpad` or run
+  with `uvx mcpad`.
+
+- **[restAD](https://pypi.org/project/restad/)** — a **read-only REST
+  interface** over `msad`, built with FastAPI + Pydantic. It exposes the same
+  search and audit operations as HTTP `GET` endpoints (with OpenAPI docs at
+  `/docs`), resolving the connection from the `msad` TOML file plus `MSAD_*`
+  environment overrides. Install with `pip install restad` or run with
+  `uvx restad`.
+
+Both are read-only: no write operation of `msad` (add/remove member, change
+password, unlock account) is reachable through them.
+
 ## Development
 
 This project uses [uv](https://docs.astral.sh/uv/). A `Makefile` wraps the common
