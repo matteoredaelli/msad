@@ -299,6 +299,8 @@ Most commands accept `--out-format`:
 
 ## Projects using msad
 
+![The msad ecosystem: msad at the core, with mcpAD (MCP), restAD (REST) and graphqlAD (GraphQL) around it](docs/ecosystem.svg)
+
 `msad` ships type hints and a stable public API (`msad.__all__`), so it can be
 embedded in other tools. Three front ends build on it:
 

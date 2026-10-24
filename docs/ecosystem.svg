@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="640" viewBox="0 0 1000 640" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" role="img" aria-label="msad at the center with three front ends around it: mcpAD (MCP), restAD (REST) and graphqlAD (GraphQL)">
+  <title>The msad ecosystem</title>
+  <desc>msad is a Python library and CLI for Active Directory / LDAP. Around it orbit three read-only front ends: mcpAD (MCP tools), restAD (REST API) and graphqlAD (GraphQL API).</desc>
+
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="78%">
+      <stop offset="0%" stop-color="#1b2550"/>
+      <stop offset="100%" stop-color="#0b1020"/>
+    </radialGradient>
+    <linearGradient id="core" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffd24a"/>
+      <stop offset="100%" stop-color="#f5a623"/>
+    </linearGradient>
+    <linearGradient id="mcp" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7c5cff"/>
+      <stop offset="100%" stop-color="#5a3ee0"/>
+    </linearGradient>
+    <linearGradient id="rest" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2ec4b6"/>
+      <stop offset="100%" stop-color="#17a398"/>
+    </linearGradient>
+    <linearGradient id="gql" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff6ec7"/>
+      <stop offset="100%" stop-color="#e5308f"/>
+    </linearGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="1000" height="640" fill="url(#bg)"/>
+
+  <!-- subtle starfield -->
+  <g fill="#ffffff" opacity="0.5">
+    <circle cx="90" cy="110" r="1.4"/><circle cx="300" cy="150" r="1"/><circle cx="700" cy="110" r="1.3"/>
+    <circle cx="910" cy="150" r="1"/><circle cx="140" cy="470" r="1.2"/><circle cx="880" cy="470" r="1.3"/>
+    <circle cx="500" cy="118" r="1"/><circle cx="60" cy="300" r="1.1"/><circle cx="950" cy="330" r="1.2"/>
+    <circle cx="360" cy="470" r="1"/><circle cx="640" cy="470" r="1"/>
+  </g>
+
+  <!-- connectors from core to each satellite -->
+  <g stroke-width="5" fill="none" stroke-linecap="round" opacity="0.9">
+    <path d="M500 320 L250 170" stroke="url(#mcp)"/>
+    <path d="M500 320 L770 170" stroke="url(#rest)"/>
+    <path d="M500 320 L500 540" stroke="url(#gql)"/>
+  </g>
+  <!-- little "read-only" packets traveling the wires -->
+  <g>
+    <circle cx="360" cy="245" r="4.5" fill="#b9a8ff"/>
+    <circle cx="645" cy="245" r="4.5" fill="#9ce8df"/>
+    <circle cx="500" cy="440" r="4.5" fill="#ffb3e3"/>
+  </g>
+
+  <!-- CORE: msad -->
+  <g filter="url(#soft)">
+    <circle cx="500" cy="320" r="106" fill="url(#core)"/>
+    <circle cx="500" cy="320" r="106" fill="none" stroke="#fff" stroke-opacity="0.5" stroke-width="2"/>
+  </g>
+  <!-- directory tree glyph -->
+  <g stroke="#7a4b00" stroke-width="3" fill="#7a4b00" stroke-linecap="round">
+    <circle cx="500" cy="268" r="5.5"/>
+    <path d="M500 274 L500 288 M470 288 L530 288 M470 288 L470 298 M500 288 L500 298 M530 288 L530 298" fill="none"/>
+    <circle cx="470" cy="302" r="4.5"/>
+    <circle cx="500" cy="302" r="4.5"/>
+    <circle cx="530" cy="302" r="4.5"/>
+  </g>
+  <text x="500" y="352" text-anchor="middle" font-size="46" font-weight="800" fill="#3a2600">msad</text>
+  <text x="500" y="380" text-anchor="middle" font-size="15" font-weight="700" fill="#7a4b00">AD / LDAP core</text>
+  <text x="500" y="401" text-anchor="middle" font-size="12.5" fill="#7a4b00" opacity="0.85">library + CLI (Python)</text>
+
+  <!-- SATELLITE: mcpAD (top-left) — plug/tool icon -->
+  <g filter="url(#soft)"><circle cx="230" cy="150" r="80" fill="url(#mcp)"/></g>
+  <g transform="translate(230 118)" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="-15" y="-8" width="30" height="20" rx="4" fill="#fff" stroke="none"/>
+    <path d="M-8 -8 L-8 -16 M8 -8 L8 -16" stroke="#fff"/>
+    <path d="M0 12 L0 20" stroke="#fff"/>
+  </g>
+  <text x="230" y="176" text-anchor="middle" font-size="27" font-weight="800" fill="#fff">mcpAD</text>
+  <text x="230" y="199" text-anchor="middle" font-size="12.5" fill="#e9e3ff">MCP tools for AI agents</text>
+
+  <!-- SATELLITE: restAD (top-right) — globe icon -->
+  <g filter="url(#soft)"><circle cx="770" cy="150" r="80" fill="url(#rest)"/></g>
+  <g transform="translate(770 116)" stroke="#fff" stroke-width="2.6" fill="none">
+    <circle cx="0" cy="0" r="17"/>
+    <ellipse cx="0" cy="0" rx="7" ry="17"/>
+    <path d="M-17 0 L17 0 M-14 -9 L14 -9 M-14 9 L14 9"/>
+  </g>
+  <text x="770" y="176" text-anchor="middle" font-size="27" font-weight="800" fill="#fff">restAD</text>
+  <text x="770" y="199" text-anchor="middle" font-size="12.5" fill="#e0fbf7">REST API (FastAPI)</text>
+
+  <!-- SATELLITE: graphqlAD (bottom) — GraphQL-style node graph -->
+  <g filter="url(#soft)"><circle cx="500" cy="560" r="80" fill="url(#gql)"/></g>
+  <g transform="translate(500 528)" stroke="#fff" stroke-width="2.4" fill="#fff">
+    <g stroke="#fff" stroke-opacity="0.9"><path d="M0 -16 L14 8 L-14 8 Z" fill="none" stroke-width="2.4"/></g>
+    <circle cx="0" cy="-16" r="4"/><circle cx="14" cy="8" r="4"/><circle cx="-14" cy="8" r="4"/>
+  </g>
+  <text x="500" y="584" text-anchor="middle" font-size="25" font-weight="800" fill="#fff">graphqlAD</text>
+  <text x="500" y="607" text-anchor="middle" font-size="12.5" fill="#ffe3f4">GraphQL API (Strawberry)</text>
+
+  <!-- title + tagline (two lines) -->
+  <text x="500" y="48" text-anchor="middle" font-size="30" font-weight="800" fill="#ffffff">One directory, many doors</text>
+  <text x="500" y="74" text-anchor="middle" font-size="14" fill="#aab4e6">pick your favourite way to talk to Active Directory —</text>
+  <text x="500" y="93" text-anchor="middle" font-size="14" fill="#aab4e6">all read-only, all powered by msad</text>
+
+  <!-- footer badge (bottom-right) -->
+  <text x="978" y="628" text-anchor="end" font-size="12" fill="#8893c9">🔒 read-only everywhere  ·  🐍 Python 3.14  ·  ⚡ uv</text>
+</svg>
