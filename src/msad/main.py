@@ -305,6 +305,7 @@ def computer_search(
     name: str | None = None,
     dns: str | None = None,
     os: str | None = None,
+    exclude_domain_controllers: bool = False,
     base: str | None = None,
     limit: int = 2000,
     domain: str | None = None,
@@ -320,6 +321,7 @@ def computer_search(
         name=name,
         dns=dns,
         os=os,
+        exclude_domain_controllers=exclude_domain_controllers,
         limit=limit,
         attributes=attributes,
     )
@@ -438,6 +440,132 @@ def stale_computers(
         include_never=include_never,
         limit=limit,
         attributes=attributes,
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def contact_search(
+    string: str | None = None,
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find contacts by cn/mail/displayName (supports * wildcards)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_contacts(
+        conn, base or config.base, string, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def security_groups(
+    scope: str | None = None,
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find security-enabled groups, optionally by --scope (global/domain_local/universal)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_security_groups(
+        conn, base or config.base, scope=scope, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def password_not_required(
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Risk: find users with the PASSWD_NOTREQD UAC flag (account may have no password)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_password_not_required(
+        conn, base or config.base, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def kerberos_preauth_not_required(
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Risk: find users not requiring Kerberos pre-auth (AS-REP roasting exposure)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_kerberos_preauth_not_required(
+        conn, base or config.base, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def not_delegated(
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Risk: find accounts flagged sensitive-and-cannot-be-delegated."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_not_delegated(conn, base or config.base, limit=limit, attributes=attributes)
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def never_expiring_accounts(
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find user accounts whose account (not password) never expires."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_never_expiring_accounts(
+        conn, base or config.base, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def expired_accounts(
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find user accounts whose accountExpires date is in the past."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_expired_accounts(
+        conn, base or config.base, limit=limit, attributes=attributes
     )
     print(_pprint(result, out_format))
 

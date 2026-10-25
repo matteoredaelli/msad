@@ -260,6 +260,7 @@ def find_computers(
     name: str | None = None,
     dns: str | None = None,
     os: str | None = None,
+    exclude_domain_controllers: bool = False,
     limit: int = 0,
     attributes: Attributes = None,
 ) -> LdapEntries:
@@ -272,6 +273,8 @@ def find_computers(
         name: matches ``cn`` (computer name).
         dns: matches ``dNSHostName`` (FQDN).
         os: matches ``operatingSystem``.
+        exclude_domain_controllers: if True, excludes domain controllers
+            (``primaryGroupID=516``) from the results.
 
     Returns:
         A list of matching computer entries (default attributes if none given).
@@ -284,6 +287,8 @@ def find_computers(
     ):
         if value:
             clauses.append(f"({attr}={escape_pattern(value)})")
+    if exclude_domain_controllers:
+        clauses.append("(!(primaryGroupID=516))")
 
     inner = "".join(clauses)
     search_filter = f"(&(objectClass=computer){inner})"
@@ -629,6 +634,228 @@ def list_empty_groups(
         search_filter,
         limit=limit,
         attributes=attributes or DEFAULT_GROUP_ATTRIBUTES,
+    )
+
+
+#: groupType bit flags (see MS-ADTS); combined with the
+#: LDAP_MATCHING_RULE_BIT_AND matching rule (1.2.840.113556.1.4.803).
+_GROUP_TYPE_SECURITY_ENABLED = 2147483648
+_GROUP_TYPE_GLOBAL = 2
+_GROUP_TYPE_DOMAIN_LOCAL = 4
+_GROUP_TYPE_UNIVERSAL = 8
+
+_GROUP_SCOPE_BITS = {
+    "global": _GROUP_TYPE_GLOBAL,
+    "domain_local": _GROUP_TYPE_DOMAIN_LOCAL,
+    "universal": _GROUP_TYPE_UNIVERSAL,
+}
+
+
+def find_security_groups(
+    conn: LdapConnection,
+    base: str,
+    *,
+    scope: str | None = None,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find security-enabled groups (as opposed to distribution groups).
+
+    Uses the ``groupType`` bit-AND matching rule
+    (``LDAP_MATCHING_RULE_BIT_AND``) to find any security group regardless of
+    scope, optionally narrowed to one scope.
+
+    Args:
+        scope: restrict to one scope: ``"global"``, ``"domain_local"`` or
+            ``"universal"``. None (default) returns security groups of any
+            scope.
+
+    Returns:
+        A list of matching group entries (default group attributes if none given).
+    """
+    bits = _GROUP_TYPE_SECURITY_ENABLED
+    if scope:
+        try:
+            bits |= _GROUP_SCOPE_BITS[scope]
+        except KeyError:
+            raise ValueError(
+                f"Invalid scope {scope!r}, expected one of {sorted(_GROUP_SCOPE_BITS)}"
+            ) from None
+    search_filter = f"(&(objectClass=group)(groupType:1.2.840.113556.1.4.803:={bits}))"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_GROUP_ATTRIBUTES,
+    )
+
+
+def find_contacts(
+    conn: LdapConnection,
+    base: str,
+    string: str | None = None,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find contact objects (``objectClass=contact``).
+
+    Args:
+        string: matches ``cn``, ``mail`` or ``displayName``; may contain
+            ``*`` wildcards. Passing None matches all contacts.
+
+    Returns:
+        A list of matching contact entries.
+    """
+    inner = ""
+    if string:
+        value = escape_pattern(string)
+        inner = f"(|(cn={value})(mail={value})(displayName={value}))"
+    search_filter = f"(&(objectClass=contact){inner})"
+    return search(conn, base, search_filter, limit=limit, attributes=attributes)
+
+
+def find_password_not_required(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find user accounts with the risky ``PASSWD_NOTREQD`` UAC flag (32).
+
+    These accounts may have no password at all, allowing anyone to
+    authenticate as them and set their own password. A common hygiene/
+    security-audit check.
+
+    Returns:
+        A list of matching user entries (default attributes if none given).
+    """
+    search_filter = (
+        "(&(objectCategory=person)(objectClass=user)"
+        "(userAccountControl:1.2.840.113556.1.4.803:=32))"
+    )
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_USER_ATTRIBUTES,
+    )
+
+
+def find_kerberos_preauth_not_required(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find user accounts that do NOT require Kerberos pre-authentication.
+
+    Matches the ``DONT_REQ_PREAUTH`` UAC flag (4194304). These accounts are
+    vulnerable to offline (AS-REP roasting) password-guessing attacks.
+
+    Returns:
+        A list of matching user entries (default attributes if none given).
+    """
+    search_filter = (
+        "(&(objectCategory=person)(objectClass=user)"
+        "(userAccountControl:1.2.840.113556.1.4.803:=4194304))"
+    )
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_USER_ATTRIBUTES,
+    )
+
+
+def find_not_delegated(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find accounts flagged \"sensitive and cannot be delegated\".
+
+    Matches the ``NOT_DELEGATED`` UAC flag (1048576). These accounts carry a
+    sensitive privilege but were explicitly excluded from Kerberos
+    delegation; a mismatch between the two is worth auditing.
+
+    Returns:
+        A list of matching user entries (default attributes if none given).
+    """
+    search_filter = "(userAccountControl:1.2.840.113556.1.4.803:=1048576)"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_USER_ATTRIBUTES,
+    )
+
+
+def find_never_expiring_accounts(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find user accounts whose ACCOUNT (not password) never expires.
+
+    Matches ``accountExpires`` set to ``0`` or ``9223372036854775807``
+    (the two sentinel values AD uses for "never"). This is distinct from
+    :func:`never_expires_password`, which checks the password-never-expires
+    UAC flag instead.
+
+    Returns:
+        A list of matching user entries (default attributes if none given).
+    """
+    search_filter = (
+        "(&(objectCategory=person)(objectClass=user)"
+        "(|(accountExpires=0)(accountExpires=9223372036854775807)))"
+    )
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_USER_ATTRIBUTES,
+    )
+
+
+def find_expired_accounts(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find user accounts whose ``accountExpires`` date is in the past.
+
+    Excludes the two "never expire" sentinel values (``0`` and
+    ``9223372036854775807``); the account must have an actual expiration
+    timestamp at or before now.
+
+    Returns:
+        A list of matching user entries (default attributes if none given).
+    """
+    cutoff = _days_ago_filetime(0)
+    search_filter = (
+        "(&(objectCategory=person)(objectClass=user)"
+        f"(accountExpires<={cutoff})"
+        "(!(accountExpires=0))(!(accountExpires=9223372036854775807)))"
+    )
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_USER_ATTRIBUTES,
     )
 
 

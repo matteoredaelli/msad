@@ -20,6 +20,8 @@ Features:
 - [X] audit reads: FSMO role owners, domain trusts, AD sites
 - [X] audit reads: GPOs, fine-grained password policies (PSOs)
 - [X] list domain controllers, empty groups, and computers grouped by OS
+- [X] find contacts, security groups (optionally by scope), and expired/never-expiring accounts
+- [X] find risky accounts: password not required, Kerberos pre-auth not required, "sensitive and not delegated"
 - [X] find users whose password violates the domain policy
 - [X] test AD connectivity (health check)
 - [X] get a single user or group
@@ -36,7 +38,9 @@ Features:
 
 By default, user lookups return a useful attribute set — identity fields plus
 `manager` (the DN of the user's manager), `memberOf` (direct group DNs),
-`userAccountControl`, `accountExpires`, `lastLogonTimestamp` and `whenCreated`.
+`userAccountControl`, `accountExpires`, `lastLogonTimestamp`, `whenCreated` and
+all `extensionAttribute1`-`extensionAttribute15` (commonly used for custom/HR
+data such as company code, employee type or division).
 Group lookups include `managedBy` (owner DN), `member`, `groupType` and
 `whenCreated`. Pass `--attributes` to override the defaults.
 
@@ -197,6 +201,9 @@ msad group-get qlik_analyzer_users
 # Find computers (name / dNSHostName / operatingSystem, values may contain *)
 msad computer-search --name "PC0*" --os "Windows Server*"
 
+# Exclude domain controllers from a computer search
+msad computer-search --exclude-domain-controllers
+
 # Get a single computer (sAMAccountName with or without trailing $, cn, or FQDN)
 msad computer-get PC001
 
@@ -228,6 +235,22 @@ msad stale-computers --days 180 --include-never
 
 # Fetch any entry by its DN (e.g. resolve a user's manager)
 msad get-by-dn "CN=Anna Bianchi,OU=Staff,DC=group,DC=example,DC=com"
+
+# Find contacts (cn / mail / displayName, values may contain *)
+msad contact-search "anna*"
+
+# Find security-enabled groups, optionally by scope
+msad security-groups
+msad security-groups --scope global
+
+# Risk: accounts with no password required / no Kerberos pre-auth / not delegated
+msad password-not-required
+msad kerberos-preauth-not-required
+msad not-delegated
+
+# Accounts whose expiration is set to "never", or whose expiration date has passed
+msad never-expiring-accounts
+msad expired-accounts
 ```
 
 ### Groups and membership

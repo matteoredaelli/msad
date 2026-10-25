@@ -10,8 +10,15 @@ from msad.search import (
     DEFAULT_USER_ATTRIBUTES,
     disabled_users,
     find_computers,
+    find_contacts,
+    find_expired_accounts,
     find_inactive_users,
+    find_kerberos_preauth_not_required,
+    find_never_expiring_accounts,
+    find_not_delegated,
     find_ous,
+    find_password_not_required,
+    find_security_groups,
     find_stale_computers,
     find_users,
     get_by_dn,
@@ -381,3 +388,77 @@ def test_summarize_computer_os_empty(conn) -> None:
 
     conn.queue([])
     assert summarize_computer_os(conn, "dc=x") == []
+
+
+def test_find_contacts_filter_no_criteria(conn) -> None:
+    conn.queue([])
+    find_contacts(conn, "dc=x")
+    assert conn.last_filter == "(&(objectClass=contact))"
+
+
+def test_find_contacts_filter_with_string(conn) -> None:
+    conn.queue([])
+    find_contacts(conn, "dc=x", "mat*")
+    f = conn.last_filter
+    assert "(objectClass=contact)" in f
+    assert "(cn=mat*)" in f
+    assert "(mail=mat*)" in f
+    assert "(displayName=mat*)" in f
+
+
+def test_find_password_not_required_filter(conn) -> None:
+    conn.queue([])
+    find_password_not_required(conn, "dc=x")
+    assert "userAccountControl:1.2.840.113556.1.4.803:=32" in conn.last_filter
+
+
+def test_find_kerberos_preauth_not_required_filter(conn) -> None:
+    conn.queue([])
+    find_kerberos_preauth_not_required(conn, "dc=x")
+    assert "userAccountControl:1.2.840.113556.1.4.803:=4194304" in conn.last_filter
+
+
+def test_find_not_delegated_filter(conn) -> None:
+    conn.queue([])
+    find_not_delegated(conn, "dc=x")
+    assert conn.last_filter == "(userAccountControl:1.2.840.113556.1.4.803:=1048576)"
+
+
+def test_find_never_expiring_accounts_filter(conn) -> None:
+    conn.queue([])
+    find_never_expiring_accounts(conn, "dc=x")
+    f = conn.last_filter
+    assert "(accountExpires=0)" in f
+    assert "(accountExpires=9223372036854775807)" in f
+
+
+def test_find_expired_accounts_filter(conn) -> None:
+    conn.queue([])
+    find_expired_accounts(conn, "dc=x")
+    f = conn.last_filter
+    assert "(!(accountExpires=0))" in f
+    assert "(!(accountExpires=9223372036854775807))" in f
+    assert "accountExpires<=" in f
+
+
+def test_find_security_groups_filter_any_scope(conn) -> None:
+    conn.queue([])
+    find_security_groups(conn, "dc=x")
+    assert "groupType:1.2.840.113556.1.4.803:=2147483648" in conn.last_filter
+
+
+def test_find_security_groups_filter_global_scope(conn) -> None:
+    conn.queue([])
+    find_security_groups(conn, "dc=x", scope="global")
+    assert "groupType:1.2.840.113556.1.4.803:=2147483650" in conn.last_filter
+
+
+def test_find_security_groups_invalid_scope(conn) -> None:
+    with pytest.raises(ValueError):
+        find_security_groups(conn, "dc=x", scope="bogus")
+
+
+def test_find_computers_exclude_domain_controllers(conn) -> None:
+    conn.queue([])
+    find_computers(conn, "dc=x", exclude_domain_controllers=True)
+    assert "(!(primaryGroupID=516))" in conn.last_filter
