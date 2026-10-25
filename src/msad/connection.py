@@ -19,7 +19,7 @@ import ssl
 from typing import Any
 
 import ldap3
-from ldap3.core.exceptions import LDAPExceptionError
+from ldap3.core.exceptions import LDAPExceptionError, LDAPPackageUnavailableError
 
 from .config import DomainConfig
 from .exceptions import MsadConnectionError
@@ -77,6 +77,13 @@ def connect(config: DomainConfig) -> LdapConnection:
     try:
         conn = _build_connection(config)
         conn.bind()
+    except LDAPPackageUnavailableError as exc:
+        raise MsadConnectionError(
+            "Kerberos authentication requires the optional 'kerberos' extra "
+            "(install with `pip install msad[kerberos]` or "
+            "`uv tool install 'msad[kerberos]'`; it needs the system Kerberos "
+            f"dev headers to build). Original error: {exc}"
+        ) from exc
     except LDAPExceptionError as exc:
         raise MsadConnectionError(f"Could not connect to {target} ({auth}): {exc}") from exc
 

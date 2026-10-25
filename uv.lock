@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.11"
 
 [[package]]
@@ -381,10 +381,14 @@ name = "msad"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
-    { name = "gssapi" },
     { name = "ldap3" },
     { name = "pydantic" },
     { name = "typer" },
+]
+
+[package.optional-dependencies]
+kerberos = [
+    { name = "gssapi" },
 ]
 
 [package.dev-dependencies]
@@ -398,11 +402,12 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "cryptography", specifier = "==50.0.1" },
-    { name = "gssapi", specifier = "==1.12.0" },
+    { name = "gssapi", marker = "extra == 'kerberos'", specifier = "==1.12.0" },
     { name = "ldap3", specifier = "==2.9.1" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "typer", specifier = "==0.27.2" },
 ]
+provides-extras = ["kerberos"]
 
 [package.metadata.requires-dev]
 dev = [

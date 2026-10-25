@@ -10,7 +10,6 @@ dynamic = ["version"]
 
 dependencies = [
     "cryptography==50.0.1",
-    "gssapi==1.12.0",
     "ldap3==2.9.1",
     "pydantic>=2.9",
     "typer==0.27.2",
@@ -26,6 +25,15 @@ classifiers = [
 ]
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
+
+[project.optional-dependencies]
+# Kerberos (SASL/GSSAPI) authentication. Requires system Kerberos dev headers
+# to build (e.g. libkrb5-dev on Debian/Ubuntu, krb5-devel on RHEL/Fedora, or
+# krb5 via Homebrew on macOS). Skip this extra if you only use user/password
+# bind.
+kerberos = [
+    "gssapi==1.12.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/matteoredaelli/msad"

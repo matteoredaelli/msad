@@ -48,10 +48,17 @@ Group lookups include `managedBy` (owner DN), `member`, `groupType` and
 
 Python >= 3.11
 
-For Kerberos authentication:
+For Kerberos authentication, install the optional `kerberos` extra
+(`msad[kerberos]`), which pulls in the `gssapi` package. `gssapi` is a native
+extension and needs system Kerberos headers to build:
 
 - krb5 library and tools (like `kinit`, ...)
+- krb5 dev headers: `libkrb5-dev` on Debian/Ubuntu, `krb5-devel` on
+  RHEL/Fedora, or `krb5` via Homebrew on macOS
 - a keytab file or `krb5.conf` configured
+
+If you only authenticate with user/password, skip the `kerberos` extra
+entirely \u2014 no native build, no system headers needed.
 
 ## Installation
 
@@ -61,6 +68,9 @@ Install as an isolated tool on your `PATH`:
 
 ```bash
 uv tool install msad
+
+# with Kerberos support:
+uv tool install 'msad[kerberos]'
 ```
 
 Run it directly without installing (ephemeral, great for one-off use):
@@ -81,6 +91,9 @@ uv tool uninstall msad
 
 ```bash
 pipx install msad
+
+# with Kerberos support:
+pipx install 'msad[kerberos]'
 ```
 
 ## Configuration
