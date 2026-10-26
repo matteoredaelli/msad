@@ -68,6 +68,11 @@ def _handle_errors(func: Callable[..., Any]) -> Callable[..., Any]:
 def _json_converter(o: Any) -> Any:
     if isinstance(o, datetime.datetime):
         return str(o)
+    elif isinstance(o, datetime.timedelta):
+        # e.g. maxPwdAge / lockoutDuration from get_password_policy /
+        # get_domain_info: ldap3 decodes these AD "interval" attributes into
+        # timedelta, which json.dumps cannot serialize on its own.
+        return str(o)
     elif isinstance(o, list):
         return ";".join(o)
     return o

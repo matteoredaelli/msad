@@ -50,3 +50,15 @@ def test_pprint_csv_joins_lists_with_pipe() -> None:
 def test_pprint_empty_returns_input() -> None:
     assert _pprint([], OutFormat.json) == []
     assert _pprint(None, OutFormat.json) is None
+
+
+def test_pprint_json_handles_timedelta() -> None:
+    """Regression: maxPwdAge/lockoutDuration (get_password_policy,
+    get_domain_info) come back from ldap3 as datetime.timedelta, which
+    json.dumps cannot serialize on its own (default() returning the same
+    object back raises "Circular reference detected")."""
+    entry = {"maxPwdAge": datetime.timedelta(days=66), "lockoutThreshold": 5}
+    out = _pprint([entry], OutFormat.jsonl).strip()
+    parsed = json.loads(out)
+    assert parsed["maxPwdAge"] == "66 days, 0:00:00"
+    assert parsed["lockoutThreshold"] == 5
