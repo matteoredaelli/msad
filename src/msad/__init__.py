@@ -48,6 +48,7 @@ from .config import (
     MsadConfig,
     load_config,
     load_domain_config,
+    resolve_domain_config,
 )
 from .connection import check_connection, connect
 from .decode import (
@@ -138,6 +139,7 @@ __all__ = [
     "MsadConfig",
     "load_config",
     "load_domain_config",
+    "resolve_domain_config",
     # connection
     "connect",
     "check_connection",

@@ -48,6 +48,23 @@ Gotcha: the CI `build` job's checkout step needs `fetch-depth: 0` (hatch-vcs
 needs full tag history). If a tag publish produces the wrong version, check
 that first.
 
+## Environment-based configuration is centralized here
+
+`resolve_domain_config(domain=None, config_file=None, env=None)` in
+`config.py` is the shared TOML + `MSAD_*` env-override resolver used by
+restAD, graphqlAD and mcpAD (previously each repo reimplemented this
+independently — restAD's/graphqlAD's copies were byte-identical). It uses
+`pydantic_settings.BaseSettings` (`env_prefix="MSAD_"`) for the env layer, so
+bool/int coercion is pydantic's, not hand-rolled. Env always wins over the
+TOML file. Downstream repos should call this (or re-export it) rather than
+hand-rolling their own `MSAD_*` parsing — if you need a new overridable
+connection field, add it to `DomainConfig` *and* `_DomainEnvOverrides` here,
+not in a consumer repo.
+
+Note `load_domain_config()` (TOML only, no env layer) still exists and is
+what the CLI (`main.py`) uses — it resolves `--domain`/`--config-file` from
+Typer flags, not environment variables, so it doesn't need the env layer.
+
 ## Kerberos is an optional extra
 
 `gssapi` lives under `[project.optional-dependencies] kerberos`, not in the

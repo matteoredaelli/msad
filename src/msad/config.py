@@ -19,14 +19,23 @@ The TOML file (``~/.msad.toml`` by default) looks like::
     use_ssl = true
     # user = "..."      # optional, enables user/password bind
     # password = "..."  # optional
+
+:func:`resolve_domain_config` additionally layers ``MSAD_*`` environment
+variable overrides on top of the TOML file (env always wins), so downstream
+services (restAD, graphqlAD, mcpAD) share one implementation instead of each
+reimplementing the same env-parsing logic.
 """
 
 from __future__ import annotations
 
+import os
 import tomllib
+from collections.abc import Mapping
+from contextlib import contextmanager
 from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .exceptions import MsadConfigError
 
@@ -156,3 +165,141 @@ def load_domain_config(
 ) -> DomainConfig:
     """Convenience helper: load the file and return one domain's config."""
     return load_config(config_file).get_domain(domain)
+
+
+#: Env var selecting which ``[domains.<name>]`` section to use.
+ENV_DOMAIN = "MSAD_DOMAIN"
+#: Env var holding the path to the msad TOML config file.
+ENV_CONFIG_FILE = "MSAD_CONFIG_FILE"
+
+
+class _DomainEnvOverrides(BaseSettings):
+    """``MSAD_*`` environment overrides for a single domain's connection.
+
+    All fields are optional so that an unset env var leaves the corresponding
+    field untouched (``None``) rather than overwriting a TOML-provided value
+    with a default. Reuses pydantic's own lax type coercion (e.g. ``"636"`` ->
+    ``636``, ``"true"``/``"yes"``/``"on"`` -> ``True``) instead of hand-rolled
+    bool/int parsing.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="MSAD_", extra="ignore")
+
+    host: str | None = None
+    base: str | None = None
+    port: int | None = None
+    use_ssl: bool | None = None
+    user: str | None = None
+    password: str | None = None
+    query_timeout: int | None = None
+
+
+@contextmanager
+def _environ_override(env: Mapping[str, str]):
+    """Temporarily replace ``os.environ`` with ``env`` for the ``with`` block.
+
+    ``pydantic_settings.BaseSettings`` always reads the real process
+    environment; this lets :func:`resolve_domain_config` accept an injected
+    mapping (mainly for tests) without changing that. Restores the original
+    environment afterwards, even on error.
+    """
+    original = dict(os.environ)
+    os.environ.clear()
+    os.environ.update(env)
+    try:
+        yield
+    finally:
+        os.environ.clear()
+        os.environ.update(original)
+
+
+def _read_env_overrides(env: Mapping[str, str] | None) -> dict[str, object]:
+    """Return the ``MSAD_*`` overrides present in ``env`` as a plain dict.
+
+    Only keys whose env var was actually set are included. ``env=None`` reads
+    the real ``os.environ``.
+    """
+    try:
+        if env is None:
+            overrides = _DomainEnvOverrides()
+        else:
+            with _environ_override(env):
+                overrides = _DomainEnvOverrides()
+    except ValidationError as exc:
+        raise MsadConfigError(f"Invalid MSAD_* environment variable: {exc}") from exc
+    return {k: v for k, v in overrides.model_dump().items() if v is not None}
+
+
+def resolve_domain_config(
+    domain: str | None = None,
+    config_file: str | Path | None = None,
+    env: Mapping[str, str] | None = None,
+) -> DomainConfig:
+    """Resolve the effective :class:`DomainConfig`: TOML file, then env overrides.
+
+    This is the one place the whole msad ecosystem (the CLI's siblings
+    restAD, graphqlAD and mcpAD) should go through when connection settings
+    may come from the environment. It layers two sources, with the second
+    always winning over the first:
+
+    1. An optional msad TOML file (see :func:`load_config`) — ``config_file``
+       if given, else the ``MSAD_CONFIG_FILE`` env var, else
+       ``~/.msad.toml`` if it exists. The ``domain`` argument (or the
+       ``MSAD_DOMAIN`` env var) selects which ``[domains.<name>]`` section to
+       use.
+    2. ``MSAD_HOST``, ``MSAD_BASE``, ``MSAD_PORT``, ``MSAD_USE_SSL``,
+       ``MSAD_USER``, ``MSAD_PASSWORD`` and ``MSAD_QUERY_TIMEOUT`` override
+       whatever the TOML file provided.
+
+    If no TOML file is found (and none was explicitly requested), the
+    configuration is built entirely from the environment: at minimum
+    ``MSAD_HOST``/``MSAD_BASE`` (or a TOML-provided ``host``/``base``) must
+    resolve to a value.
+
+    Args:
+        domain: domain name; falls back to the ``MSAD_DOMAIN`` env var, then
+            the TOML file's ``[defaults]`` section.
+        config_file: path to the TOML file; falls back to the
+            ``MSAD_CONFIG_FILE`` env var, then ``~/.msad.toml`` if present.
+        env: environment mapping to read ``MSAD_*`` values from (including
+            ``MSAD_DOMAIN``/``MSAD_CONFIG_FILE`` when ``domain``/
+            ``config_file`` are not passed explicitly). Defaults to the real
+            process environment (``os.environ``); mainly injectable for
+            tests.
+
+    Returns:
+        A validated :class:`DomainConfig`.
+
+    Raises:
+        MsadConfigError: if required fields are missing, an env var has an
+            invalid value, or the TOML file (when one is resolved) is
+            missing/invalid.
+    """
+    environ: Mapping[str, str] = os.environ if env is None else env
+
+    resolved_domain = domain or environ.get(ENV_DOMAIN)
+    resolved_config_file = config_file or environ.get(ENV_CONFIG_FILE)
+
+    path = Path(resolved_config_file) if resolved_config_file else None
+    if path is None and DEFAULT_CONFIG_PATH.is_file():
+        path = DEFAULT_CONFIG_PATH
+
+    data: dict[str, object] = {}
+    if path is not None:
+        data = load_config(path).get_domain(resolved_domain).model_dump()
+
+    data.update(_read_env_overrides(env))
+
+    missing = [key for key in ("host", "base") if not data.get(key)]
+    if missing:
+        raise MsadConfigError(
+            "Missing required configuration: "
+            + ", ".join(missing)
+            + ". Provide them via the msad TOML file or the MSAD_HOST / MSAD_BASE "
+            "environment variables."
+        )
+
+    try:
+        return DomainConfig.model_validate(data)
+    except ValidationError as exc:
+        raise MsadConfigError(f"Invalid configuration: {exc}") from exc
