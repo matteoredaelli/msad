@@ -9,18 +9,26 @@ from msad.search import (
     DEFAULT_OU_ATTRIBUTES,
     DEFAULT_USER_ATTRIBUTES,
     disabled_users,
+    find_admin_count_accounts,
     find_computers,
     find_contacts,
+    find_distribution_groups,
+    find_empty_ous,
     find_expired_accounts,
     find_inactive_users,
     find_kerberos_preauth_not_required,
+    find_must_change_password,
     find_never_expiring_accounts,
     find_not_delegated,
     find_ous,
     find_password_not_required,
+    find_recently_created,
+    find_recently_modified,
     find_security_groups,
+    find_service_accounts,
     find_stale_computers,
     find_users,
+    find_users_without_email,
     get_by_dn,
     get_computer,
     get_dn,
@@ -462,3 +470,79 @@ def test_find_computers_exclude_domain_controllers(conn) -> None:
     conn.queue([])
     find_computers(conn, "dc=x", exclude_domain_controllers=True)
     assert "(!(primaryGroupID=516))" in conn.last_filter
+
+
+def test_find_users_city_state_country_filter(conn) -> None:
+    conn.queue([])
+    find_users(conn, "dc=x", city="Milan", state="Lombardy", country="Italy")
+    f = conn.last_filter
+    assert "(l=Milan)" in f
+    assert "(st=Lombardy)" in f
+    assert "(co=Italy)" in f
+
+
+def test_find_service_accounts_filter(conn) -> None:
+    conn.queue([])
+    find_service_accounts(conn, "dc=x")
+    assert conn.last_filter == (
+        "(&(objectCategory=person)(objectClass=user)(servicePrincipalName=*))"
+    )
+
+
+def test_find_admin_count_accounts_filter(conn) -> None:
+    conn.queue([])
+    find_admin_count_accounts(conn, "dc=x")
+    assert conn.last_filter == "(&(objectCategory=person)(objectClass=user)(adminCount=1))"
+
+
+def test_find_must_change_password_filter(conn) -> None:
+    conn.queue([])
+    find_must_change_password(conn, "dc=x")
+    f = conn.last_filter
+    assert "(pwdLastSet=0)" in f
+    assert "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" in f
+
+
+def test_find_users_without_email_filter(conn) -> None:
+    conn.queue([])
+    find_users_without_email(conn, "dc=x")
+    assert conn.last_filter == "(&(objectCategory=person)(objectClass=user)(!(mail=*)))"
+
+
+def test_find_distribution_groups_filter(conn) -> None:
+    conn.queue([])
+    find_distribution_groups(conn, "dc=x")
+    assert conn.last_filter == (
+        "(&(objectClass=group)(!(groupType:1.2.840.113556.1.4.803:=2147483648)))"
+    )
+
+
+def test_find_empty_ous_filter(conn) -> None:
+    conn.queue([])
+    find_empty_ous(conn, "dc=x")
+    assert conn.last_filter == "(&(objectCategory=organizationalUnit)(!(ou=*)))"
+    assert conn.searches[-1].attributes == DEFAULT_OU_ATTRIBUTES
+
+
+def test_find_recently_modified_filter_no_class(conn) -> None:
+    conn.queue([])
+    find_recently_modified(conn, "dc=x", days=7)
+    f = conn.last_filter
+    assert f.startswith("(&(whenChanged>=")
+    assert f.endswith("))")
+
+
+def test_find_recently_modified_filter_with_class(conn) -> None:
+    conn.queue([])
+    find_recently_modified(conn, "dc=x", days=1, object_class="user")
+    f = conn.last_filter
+    assert "(objectClass=user)" in f
+    assert "(whenChanged>=" in f
+
+
+def test_find_recently_created_filter(conn) -> None:
+    conn.queue([])
+    find_recently_created(conn, "dc=x", days=30, object_class="computer")
+    f = conn.last_filter
+    assert "(objectClass=computer)" in f
+    assert "(whenCreated>=" in f

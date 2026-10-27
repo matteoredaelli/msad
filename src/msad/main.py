@@ -219,6 +219,9 @@ def user_search(
     mail: str | None = None,
     sam: str | None = None,
     department: str | None = None,
+    city: str | None = None,
+    state: str | None = None,
+    country: str | None = None,
     base: str | None = None,
     limit: int = 2000,
     domain: str | None = None,
@@ -226,7 +229,7 @@ def user_search(
     out_format: OutFormat = OutFormat.jsonl,
     attributes: list[str] | None = None,
 ):
-    """Find users by field (name/surname/mail/sam/department, all ANDed)."""
+    """Find users by field (name/surname/mail/sam/department/city/state/country, all ANDed)."""
     config, conn = _connect(domain, config_file)
     result = msad.find_users(
         conn,
@@ -236,6 +239,9 @@ def user_search(
         mail=mail,
         sam=sam,
         department=department,
+        city=city,
+        state=state,
+        country=country,
         limit=limit,
         attributes=attributes,
     )
@@ -401,6 +407,22 @@ def ou_contents(
 
 @app.command()
 @_handle_errors
+def empty_ous(
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find organizational units with no nested sub-OU (hygiene check)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_empty_ous(conn, base or config.base, limit=limit, attributes=attributes)
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
 def inactive_users(
     days: int = 90,
     base: str | None = None,
@@ -489,6 +511,24 @@ def security_groups(
 
 @app.command()
 @_handle_errors
+def distribution_groups(
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find distribution groups (complement of security_groups)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_distribution_groups(
+        conn, base or config.base, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
 def password_not_required(
     base: str | None = None,
     limit: int = 2000,
@@ -571,6 +611,128 @@ def expired_accounts(
     config, conn = _connect(domain, config_file)
     result = msad.find_expired_accounts(
         conn, base or config.base, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def service_accounts(
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Risk: find user accounts with a Service Principal Name (Kerberoasting exposure)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_service_accounts(
+        conn, base or config.base, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def admin_count_accounts(
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find user accounts with adminCount=1 (current or stale protected-admin marker)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_admin_count_accounts(
+        conn, base or config.base, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def must_change_password(
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find enabled users who must change their password at next logon."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_must_change_password(
+        conn, base or config.base, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def users_without_email(
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Data-quality check: find user accounts with no mail attribute set."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_users_without_email(
+        conn, base or config.base, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def recently_modified(
+    days: int = 7,
+    object_class: str | None = None,
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find objects changed in the last N days, optionally by --object-class."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_recently_modified(
+        conn,
+        base or config.base,
+        days=days,
+        object_class=object_class,
+        limit=limit,
+        attributes=attributes,
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def recently_created(
+    days: int = 7,
+    object_class: str | None = None,
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find objects created in the last N days, optionally by --object-class."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_recently_created(
+        conn,
+        base or config.base,
+        days=days,
+        object_class=object_class,
+        limit=limit,
+        attributes=attributes,
     )
     print(_pprint(result, out_format))
 

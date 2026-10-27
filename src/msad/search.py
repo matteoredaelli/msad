@@ -187,6 +187,9 @@ def find_users(
     mail: str | None = None,
     sam: str | None = None,
     department: str | None = None,
+    city: str | None = None,
+    state: str | None = None,
+    country: str | None = None,
     limit: int = 0,
     attributes: Attributes = None,
 ) -> LdapEntries:
@@ -201,6 +204,10 @@ def find_users(
         mail: matches ``mail``.
         sam: matches ``sAMAccountName``.
         department: matches ``department``.
+        city: matches ``l`` (office city).
+        state: matches ``st`` (state/province).
+        country: matches ``co`` (country name, as typed; distinct from the
+            2-letter ``c`` attribute).
 
     Returns:
         A list of matching user entries (default attributes if none given).
@@ -212,6 +219,9 @@ def find_users(
         ("mail", mail),
         ("sAMAccountName", sam),
         ("department", department),
+        ("l", city),
+        ("st", state),
+        ("co", country),
     ):
         if value:
             clauses.append(f"({attr}={escape_pattern(value)})")
@@ -387,6 +397,32 @@ def find_ous(
     )
 
 
+def find_empty_ous(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find organizational units that have no nested sub-OU.
+
+    Matches ``(!(ou=*))``. A common hygiene/audit check, analogous to
+    :func:`list_empty_groups`. Note this only checks for nested OUs, not for
+    leaf objects (users, computers, groups) directly inside the OU.
+
+    Returns:
+        A list of matching OU entries (default OU attributes if none given).
+    """
+    search_filter = "(&(objectCategory=organizationalUnit)(!(ou=*)))"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_OU_ATTRIBUTES,
+    )
+
+
 def get_ou(
     conn: LdapConnection,
     base: str,
@@ -453,6 +489,64 @@ def _days_ago_filetime(days: int) -> int:
     cutoff = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=days)
     unix_seconds = cutoff.timestamp()
     return int((unix_seconds + _FILETIME_EPOCH_OFFSET) * 10_000_000)
+
+
+def _days_ago_generalized_time(days: int) -> str:
+    """Return the LDAP generalized-time string for ``now - days``.
+
+    ``whenChanged``/``whenCreated`` use the generalized-time syntax
+    (``YYYYMMDDHHMMSS.0Z``), unlike the FILETIME integers used by
+    ``lastLogonTimestamp``/``pwdLastSet``/``accountExpires``.
+    """
+    cutoff = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=days)
+    return cutoff.strftime("%Y%m%d%H%M%S.0Z")
+
+
+def find_recently_modified(
+    conn: LdapConnection,
+    base: str,
+    *,
+    days: int = 7,
+    object_class: str | None = None,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find objects whose ``whenChanged`` is within the last ``days`` days.
+
+    Useful for a "what changed recently in AD" audit. Pass ``object_class``
+    (e.g. ``"user"``, ``"group"``, ``"computer"``) to restrict to one object
+    type; omit it to match any object.
+
+    Returns:
+        A list of matching entries (all attributes if none given).
+    """
+    cutoff = _days_ago_generalized_time(days)
+    class_filter = f"(objectClass={escape_exact(object_class)})" if object_class else ""
+    search_filter = f"(&{class_filter}(whenChanged>={cutoff}))"
+    return search(conn, base, search_filter, limit=limit, attributes=attributes)
+
+
+def find_recently_created(
+    conn: LdapConnection,
+    base: str,
+    *,
+    days: int = 7,
+    object_class: str | None = None,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find objects whose ``whenCreated`` is within the last ``days`` days.
+
+    Pass ``object_class`` (e.g. ``"user"``, ``"group"``, ``"computer"``) to
+    restrict to one object type; omit it to match any object.
+
+    Returns:
+        A list of matching entries (all attributes if none given).
+    """
+    cutoff = _days_ago_generalized_time(days)
+    class_filter = f"(objectClass={escape_exact(object_class)})" if object_class else ""
+    search_filter = f"(&{class_filter}(whenCreated>={cutoff}))"
+    return search(conn, base, search_filter, limit=limit, attributes=attributes)
 
 
 def find_inactive_users(
@@ -691,6 +785,35 @@ def find_security_groups(
     )
 
 
+def find_distribution_groups(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find distribution groups (as opposed to security-enabled groups).
+
+    Complement of :func:`find_security_groups`: matches groups that do NOT
+    have the security-enabled ``groupType`` bit set, using the ``groupType``
+    bit-AND matching rule (``LDAP_MATCHING_RULE_BIT_AND``).
+
+    Returns:
+        A list of matching group entries (default group attributes if none given).
+    """
+    search_filter = (
+        "(&(objectClass=group)"
+        f"(!(groupType:1.2.840.113556.1.4.803:={_GROUP_TYPE_SECURITY_ENABLED})))"
+    )
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_GROUP_ATTRIBUTES,
+    )
+
+
 def find_contacts(
     conn: LdapConnection,
     base: str,
@@ -789,6 +912,121 @@ def find_not_delegated(
         A list of matching user entries (default attributes if none given).
     """
     search_filter = "(userAccountControl:1.2.840.113556.1.4.803:=1048576)"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_USER_ATTRIBUTES,
+    )
+
+
+def find_service_accounts(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find user accounts with a Service Principal Name (SPN) set.
+
+    Matches ``servicePrincipalName=*``. Any account with an SPN can have a
+    Kerberos service ticket requested for it by any authenticated user, then
+    cracked offline ("Kerberoasting") if its password is weak. A common
+    hygiene/security-audit check.
+
+    Returns:
+        A list of matching user entries (default attributes if none given).
+    """
+    search_filter = "(&(objectCategory=person)(objectClass=user)(servicePrincipalName=*))"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_USER_ATTRIBUTES,
+    )
+
+
+def find_admin_count_accounts(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find user accounts with ``adminCount=1`` (protected-admin marker).
+
+    AD sets ``adminCount=1`` on accounts that are (or were) members of a
+    protected group such as Domain Admins or Enterprise Admins, via the
+    AdminSDHolder process, and does not automatically clear it once the
+    account is later removed from every such group. Accounts that still
+    carry ``adminCount=1`` but are no longer privileged keep a
+    non-inherited, hardened ACL and are a common, easily-overlooked
+    audit finding. Cross-reference against
+    :func:`msad.audit.get_privileged_groups` members to find the stale ones.
+
+    Returns:
+        A list of matching user entries (default attributes if none given).
+    """
+    search_filter = "(&(objectCategory=person)(objectClass=user)(adminCount=1))"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_USER_ATTRIBUTES,
+    )
+
+
+def find_must_change_password(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find enabled users who must change their password at next logon.
+
+    Matches ``pwdLastSet=0``, excluding disabled accounts (UAC flag 2). This
+    is a standalone check independent of the domain password policy; compare
+    with :func:`msad.audit.get_password_policy_violations`, which only
+    flags ``pwdLastSet=0`` accounts together with actual password-age
+    violations (and requires the domain to have a ``maxPwdAge``).
+
+    Returns:
+        A list of matching user entries (default attributes if none given).
+    """
+    search_filter = (
+        "(&(objectCategory=person)(objectClass=user)(pwdLastSet=0)"
+        "(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"
+    )
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_USER_ATTRIBUTES,
+    )
+
+
+def find_users_without_email(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find user accounts with no ``mail`` attribute set.
+
+    A data-quality/hygiene check: accounts without an email address often
+    can't receive password-expiry notices, MFA prompts or other automated
+    notifications.
+
+    Returns:
+        A list of matching user entries (default attributes if none given).
+    """
+    search_filter = "(&(objectCategory=person)(objectClass=user)(!(mail=*)))"
     return search(
         conn,
         base,
