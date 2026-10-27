@@ -50,7 +50,7 @@ from .config import (
     load_domain_config,
     resolve_domain_config,
 )
-from .connection import check_connection, connect
+from .connection import check_connection, connect, whoami
 from .decode import (
     decode_entries,
     decode_entry,
@@ -151,6 +151,7 @@ __all__ = [
     # connection
     "connect",
     "check_connection",
+    "whoami",
     # decode (pure attribute decoders)
     "decode_entry",
     "decode_entries",

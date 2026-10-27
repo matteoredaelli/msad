@@ -151,3 +151,18 @@ def test_build_connection_timeout_defaults_none(monkeypatch: pytest.MonkeyPatch)
     cfg = DomainConfig(host="dc", base="dc=x", user="svc", password="p")
     connection._build_connection(cfg)
     assert captured["receive_timeout"] is None
+
+
+def test_whoami_returns_authzid(conn) -> None:
+    from msad.connection import whoami
+
+    conn.who_am_i_value = "u:redaema001"
+    assert whoami(conn) == "u:redaema001"
+    assert ("who_am_i",) in conn.calls
+
+
+def test_whoami_returns_none_when_unset(conn) -> None:
+    from msad.connection import whoami
+
+    conn.who_am_i_value = None
+    assert whoami(conn) is None

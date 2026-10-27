@@ -54,6 +54,10 @@ class _Standard:
         empty: list[dict[str, Any]] = []
         return empty
 
+    def who_am_i(self, controls: Any = None) -> str | None:
+        self._conn.calls.append(("who_am_i",))
+        return self._conn.who_am_i_value
+
 
 class _Microsoft:
     def __init__(self, conn: FakeConnection) -> None:
@@ -87,6 +91,7 @@ class FakeConnection:
     responses: list[list[dict[str, Any]]] = field(default_factory=list)
     searches: list[RecordedSearch] = field(default_factory=list)
     calls: list[tuple[Any, ...]] = field(default_factory=list)
+    who_am_i_value: str | None = None
 
     def __post_init__(self) -> None:
         self.extend = _Extend(self)

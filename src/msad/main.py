@@ -181,6 +181,19 @@ def test_connection(
 
 @app.command()
 @_handle_errors
+def whoami(
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+):
+    """Report the identity the connection is bound as (works with Kerberos too)."""
+    _, conn = _connect(domain, config_file)
+    result = msad.whoami(conn)
+    print(_pprint([{"authzid": result}], out_format))
+
+
+@app.command()
+@_handle_errors
 def search(
     filter: str,
     limit: int = 2000,

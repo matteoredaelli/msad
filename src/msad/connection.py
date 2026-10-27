@@ -127,3 +127,22 @@ def check_connection(config: DomainConfig) -> dict[str, Any]:
         logging.debug("unbind after check_connection failed", exc_info=True)
 
     return {"ok": True, "target": target, "auth": auth, "error": None}
+
+
+def whoami(conn: LdapConnection) -> str | None:
+    """Return the identity the connection is bound as (RFC 4532 "Who Am I?").
+
+    Works regardless of the authentication method (Kerberos/SASL-GSSAPI or
+    simple user/password bind): the directory server reports the identity it
+    actually authenticated, which is the authoritative answer, as opposed to
+    inspecting the local Kerberos credential cache (``klist``) or the bind
+    user configured client-side.
+
+    Returns:
+        The ``authzid`` string reported by the server (e.g.
+        ``"u:redaema001"`` or ``"dn:CN=...,DC=..."``), or None if the server
+        didn't return one (e.g. anonymous bind, or the extended operation is
+        unsupported).
+    """
+    result = conn.extend.standard.who_am_i()
+    return result if result else None
