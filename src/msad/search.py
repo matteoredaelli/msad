@@ -44,6 +44,7 @@ DEFAULT_USER_ATTRIBUTES = [
     "memberOf",
     "userAccountControl",
     "accountExpires",
+    "pwdLastSet",
     "lastLogonTimestamp",
     "whenCreated",
     "distinguishedName",
