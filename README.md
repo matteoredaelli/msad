@@ -335,6 +335,28 @@ Most commands accept `--out-format`:
 - `json`: a single JSON array
 - `csv`: tab-separated, list values joined with `|`
 
+### Shell completion
+
+`msad` is built with [Typer](https://typer.tiangolo.com), which provides
+bash/zsh/fish/PowerShell completion out of the box — no extra setup needed
+beyond running:
+
+```bash
+msad --install-completion   # auto-detects your shell and installs the script
+# then restart your terminal
+```
+
+To inspect or install the script manually instead:
+
+```bash
+msad --show-completion
+```
+
+Completion covers commands and options (`--domain`, `--base`,
+`--attributes`, `--out-format`, ...) and stays in sync automatically as
+commands are added or renamed, since it's generated dynamically from the
+CLI definition rather than a static script.
+
 ## Projects using msad
 
 `msad` ships type hints and a stable public API (`msad.__all__`), so it can be
