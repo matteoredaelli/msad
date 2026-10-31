@@ -816,6 +816,160 @@ def privileged_groups(
 
 @app.command()
 @_handle_errors
+def subnets(
+    limit: int = 0,
+    config_base: str | None = None,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """List AD subnets (CIDR -> site) from the Configuration NC (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.list_subnets(
+        conn,
+        config.base,
+        config_base=config_base,
+        limit=limit,
+        attributes=attributes,
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def site_links(
+    limit: int = 0,
+    config_base: str | None = None,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """List AD site links (inter-site replication topology) (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.list_site_links(
+        conn,
+        config.base,
+        config_base=config_base,
+        limit=limit,
+        attributes=attributes,
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def servers(
+    limit: int = 0,
+    config_base: str | None = None,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """List directory servers (DCs) from the Configuration NC, site-centric (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.list_servers(
+        conn,
+        config.base,
+        config_base=config_base,
+        limit=limit,
+        attributes=attributes,
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def dns_zones(
+    limit: int = 0,
+    zone_base: str | None = None,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """List AD-integrated DNS zones (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.list_dns_zones(
+        conn,
+        config.base,
+        zone_base=zone_base,
+        limit=limit,
+        attributes=attributes,
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def authorized_dhcp_servers(
+    limit: int = 0,
+    config_base: str | None = None,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """List DHCP servers authorized in AD (authorization only, no scopes) (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.list_authorized_dhcp_servers(
+        conn,
+        config.base,
+        config_base=config_base,
+        limit=limit,
+        attributes=attributes,
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def dns_records(
+    zone: str,
+    limit: int = 0,
+    zone_base: str | None = None,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """List DNS records of an AD-integrated zone (raw dnsRecord blobs) (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.list_dns_records(
+        conn,
+        config.base,
+        zone,
+        zone_base=zone_base,
+        limit=limit,
+        attributes=attributes,
+    )
+    print(_pprint(msad.decode_entries(result), out_format))
+
+
+@app.command()
+@_handle_errors
+def dfs_namespaces(
+    limit: int = 0,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """List domain-based DFS namespace roots (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.list_dfs_namespaces(
+        conn,
+        config.base,
+        limit=limit,
+        attributes=attributes,
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
 def is_member(
     group: str,
     user: str,

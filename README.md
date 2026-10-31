@@ -17,7 +17,9 @@ Features:
 - [X] search organizational units (OUs) and list their contents
 - [X] find inactive users / stale computers (last logon older than N days)
 - [X] audit reads: domain info, default password policy, privileged groups
-- [X] audit reads: FSMO role owners, domain trusts, AD sites
+- [X] audit reads: FSMO role owners, domain trusts, AD sites, subnets, site links and servers
+- [X] audit reads: AD-integrated DNS zones and records (decoded A/AAAA/NS/CNAME/PTR/MX/SRV/SOA/TXT)
+- [X] audit reads: authorized DHCP servers and domain-based DFS namespaces
 - [X] audit reads: GPOs, fine-grained password policies (PSOs)
 - [X] list domain controllers, empty groups, and computers grouped by OS
 - [X] find contacts, security groups (optionally by scope), and expired/never-expiring accounts
@@ -305,6 +307,19 @@ msad privileged-groups
 # Include the actual members (optionally expand nested membership)
 msad privileged-groups --with-members
 msad privileged-groups --with-members --nested
+
+# Network topology (Configuration NC): subnets, site links and servers (DCs)
+msad subnets
+msad site-links
+msad servers
+
+# AD-integrated DNS: zones, and the (decoded) records of a zone
+msad dns-zones
+msad dns-records example.com
+
+# Authorized DHCP servers and domain-based DFS namespaces
+msad authorized-dhcp-servers
+msad dfs-namespaces
 ```
 
 ### Account checks

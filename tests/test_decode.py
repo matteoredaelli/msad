@@ -7,6 +7,8 @@ import struct
 import uuid
 
 from msad.decode import (
+    decode_dns_record,
+    decode_dns_records,
     decode_entries,
     decode_entry,
     decode_filetime,
@@ -189,3 +191,131 @@ def test_decode_entries_maps_all() -> None:
     out = decode_entries([{"userAccountControl": 512}, {"groupType": 8}])
     assert out[0]["userAccountControl_decoded"]["disabled"] is False
     assert out[1]["groupType_decoded"]["scope"] == "universal"
+
+
+# --- dnsRecord -------------------------------------------------------------
+
+
+def _dns_record(rtype: int, data: bytes, ttl: int = 3600) -> bytes:
+    """Build a DNS_RPC_RECORD blob: 24-byte header + type-specific data.
+
+    Header: wDataLength(LE,2) wType(LE,2) dwFlags(4) dwSerial(4)
+    dwTtlSeconds(BE,4) dwTimeStamp(4) dwReserved(4).
+    """
+    header = (
+        struct.pack("<H", len(data))
+        + struct.pack("<H", rtype)
+        + b"\x00\x00\x00\x00"  # dwFlags
+        + b"\x00\x00\x00\x00"  # dwSerial
+        + struct.pack(">I", ttl)  # dwTtlSeconds (big-endian)
+        + b"\x00\x00\x00\x00"  # dwTimeStamp
+        + b"\x00\x00\x00\x00"  # dwReserved
+    )
+    return header + data
+
+
+def _dns_count_name(name: str) -> bytes:
+    """Encode a dotted name as a DNS_COUNT_NAME (total-len, label-count, labels)."""
+    labels = [label for label in name.rstrip(".").split(".") if label]
+    body = b"".join(bytes([len(label)]) + label.encode() for label in labels)
+    total = len(body) + 1  # +1 for the trailing root (as Windows counts it)
+    return bytes([total, len(labels)]) + body
+
+
+def test_decode_dns_record_a() -> None:
+    blob = _dns_record(1, bytes([10, 20, 0, 5]), ttl=600)
+    d = decode_dns_record(blob)
+    assert d is not None
+    assert d["type"] == "A"
+    assert d["type_id"] == 1
+    assert d["ttl"] == 600
+    assert d["data"] == "10.20.0.5"
+
+
+def test_decode_dns_record_aaaa() -> None:
+    import ipaddress
+
+    packed = ipaddress.IPv6Address("2001:db8::1").packed
+    d = decode_dns_record(_dns_record(28, packed))
+    assert d is not None
+    assert d["type"] == "AAAA"
+    assert d["data"] == "2001:db8::1"
+
+
+def test_decode_dns_record_cname() -> None:
+    d = decode_dns_record(_dns_record(5, _dns_count_name("host.example.com")))
+    assert d is not None
+    assert d["type"] == "CNAME"
+    assert d["data"] == "host.example.com."
+
+
+def test_decode_dns_record_srv() -> None:
+    data = struct.pack(">HHH", 0, 100, 389) + _dns_count_name("dc1.example.com")
+    d = decode_dns_record(_dns_record(33, data))
+    assert d is not None
+    assert d["type"] == "SRV"
+    assert d["data"]["priority"] == 0
+    assert d["data"]["weight"] == 100
+    assert d["data"]["port"] == 389
+    assert d["data"]["target"] == "dc1.example.com."
+
+
+def test_decode_dns_record_mx() -> None:
+    data = struct.pack(">H", 10) + _dns_count_name("mail.example.com")
+    d = decode_dns_record(_dns_record(15, data))
+    assert d is not None
+    assert d["type"] == "MX"
+    assert d["data"]["preference"] == 10
+    assert d["data"]["exchange"] == "mail.example.com."
+
+
+def test_decode_dns_record_txt() -> None:
+    data = bytes([5]) + b"hello" + bytes([3]) + b"foo"
+    d = decode_dns_record(_dns_record(16, data))
+    assert d is not None
+    assert d["type"] == "TXT"
+    assert d["data"] == ["hello", "foo"]
+
+
+def test_decode_dns_record_soa() -> None:
+    data = (
+        struct.pack(">IIIII", 42, 900, 600, 86400, 3600)
+        + _dns_count_name("dc1.example.com")
+        + _dns_count_name("hostmaster.example.com")
+    )
+    d = decode_dns_record(_dns_record(6, data))
+    assert d is not None
+    assert d["type"] == "SOA"
+    assert d["data"]["serial"] == 42
+    assert d["data"]["primary_server"] == "dc1.example.com."
+    assert d["data"]["responsible_party"] == "hostmaster.example.com."
+
+
+def test_decode_dns_record_unknown_type_is_hex() -> None:
+    d = decode_dns_record(_dns_record(99, b"\xde\xad\xbe\xef"))
+    assert d is not None
+    assert d["type"] == "TYPE99"
+    assert d["data"] == "deadbeef"
+
+
+def test_decode_dns_record_rejects_short_and_nonbytes() -> None:
+    assert decode_dns_record(b"\x00" * 10) is None  # shorter than header
+    assert decode_dns_record("not bytes") is None
+    assert decode_dns_record(None) is None
+
+
+def test_decode_dns_records_handles_list_and_single() -> None:
+    a = _dns_record(1, bytes([1, 1, 1, 1]))
+    aaaa = _dns_record(28, b"\x00" * 16)
+    assert len(decode_dns_records([a, aaaa])) == 2
+    assert len(decode_dns_records(a)) == 1
+    # Undecodable values are skipped.
+    assert decode_dns_records([b"short"]) == []
+
+
+def test_decode_entry_adds_dns_records() -> None:
+    blob = _dns_record(1, bytes([192, 168, 1, 1]))
+    decoded = decode_entry({"name": "www", "dnsRecord": blob})
+    assert decoded["name"] == "www"
+    assert decoded["dnsRecord_decoded"][0]["type"] == "A"
+    assert decoded["dnsRecord_decoded"][0]["data"] == "192.168.1.1"

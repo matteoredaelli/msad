@@ -30,6 +30,7 @@ callers that rely on the raw attributes keep working unchanged.
 from __future__ import annotations
 
 import datetime
+import ipaddress
 import struct
 import uuid
 from typing import Any
@@ -219,6 +220,144 @@ def decode_guid(value: Any) -> str | None:
     return str(uuid.UUID(bytes_le=data))
 
 
+# --- dnsRecord (AD-integrated DNS DNS_RPC_RECORD blob) ---------------------
+
+#: DNS record type numbers (``wType``) this decoder understands by name.
+_DNS_RECORD_TYPES: dict[int, str] = {
+    1: "A",
+    2: "NS",
+    5: "CNAME",
+    6: "SOA",
+    12: "PTR",
+    13: "HINFO",
+    15: "MX",
+    16: "TXT",
+    28: "AAAA",
+    33: "SRV",
+}
+
+
+def _read_dns_count_name(data: bytes, offset: int) -> tuple[str, int]:
+    """Read a DNS_COUNT_NAME at ``offset``; return (dotted-name, new offset).
+
+    DNS_COUNT_NAME is ``cchNameLength`` (1 byte, total length) + ``cLabelCount``
+    (1 byte) + that many length-prefixed labels. Returns the name joined with
+    dots (with a trailing dot, matching the on-wire absolute form) and the
+    offset just past the structure.
+    """
+    if offset + 2 > len(data):
+        return "", len(data)
+    # data[offset] is the total byte length of the name buffer; we drive the
+    # parse off the per-label length bytes instead, which is unambiguous.
+    label_count = data[offset + 1]
+    pos = offset + 2
+    labels: list[str] = []
+    for _ in range(label_count):
+        if pos >= len(data):
+            break
+        length = data[pos]
+        pos += 1
+        labels.append(data[pos : pos + length].decode("utf-8", "replace"))
+        pos += length
+    name = ".".join(labels)
+    return (f"{name}." if name else "."), pos
+
+
+def _decode_dns_txt(data: bytes) -> list[str]:
+    """Decode the Data of a TXT record into its list of character-strings."""
+    strings: list[str] = []
+    pos = 0
+    while pos < len(data):
+        length = data[pos]
+        pos += 1
+        strings.append(data[pos : pos + length].decode("utf-8", "replace"))
+        pos += length
+    return strings
+
+
+def _decode_dns_data(rtype: int, data: bytes) -> Any:
+    """Decode the type-specific Data payload of a DNS_RPC_RECORD."""
+    if rtype == 1 and len(data) >= 4:  # A
+        return str(ipaddress.IPv4Address(data[:4]))
+    if rtype == 28 and len(data) >= 16:  # AAAA
+        return str(ipaddress.IPv6Address(data[:16]))
+    if rtype in (2, 5, 12):  # NS / CNAME / PTR -> a single target name
+        name, _ = _read_dns_count_name(data, 0)
+        return name
+    if rtype == 16:  # TXT
+        return _decode_dns_txt(data)
+    if rtype == 15 and len(data) >= 2:  # MX: preference + exchange name
+        preference = struct.unpack(">H", data[:2])[0]
+        exchange, _ = _read_dns_count_name(data, 2)
+        return {"preference": preference, "exchange": exchange}
+    if rtype == 33 and len(data) >= 6:  # SRV: priority, weight, port + target
+        priority, weight, port = struct.unpack(">HHH", data[:6])
+        target, _ = _read_dns_count_name(data, 6)
+        return {"priority": priority, "weight": weight, "port": port, "target": target}
+    if rtype == 6 and len(data) >= 20:  # SOA
+        serial, refresh, retry, expire, minimum = struct.unpack(">IIIII", data[:20])
+        primary, pos = _read_dns_count_name(data, 20)
+        admin, _ = _read_dns_count_name(data, pos)
+        return {
+            "serial": serial,
+            "refresh": refresh,
+            "retry": retry,
+            "expire": expire,
+            "minimum_ttl": minimum,
+            "primary_server": primary,
+            "responsible_party": admin,
+        }
+    # Unknown / unsupported type: surface the raw payload as hex.
+    return data.hex()
+
+
+def decode_dns_record(value: Any) -> dict[str, Any] | None:
+    """Decode a single binary ``dnsRecord`` (DNS_RPC_RECORD) value.
+
+    The fixed header is ``wDataLength`` (2), ``wType`` (2), ``dwFlags`` (4),
+    ``dwSerial`` (4), ``dwTtlSeconds`` (4, big-endian), ``dwTimeStamp`` (4) and
+    ``dwReserved`` (4), all little-endian except the TTL, followed by
+    ``wDataLength`` bytes of type-specific data (24-byte header total).
+
+    Returns a dict with ``type`` (name, or ``TYPE<n>`` when unknown),
+    ``type_id``, ``ttl`` and ``data`` (the decoded payload: an address string
+    for A/AAAA, a target name for NS/CNAME/PTR, a list for TXT, a dict for
+    MX/SRV/SOA, or a hex string for unsupported types). Returns None if the
+    value is not at least a full 24-byte header.
+    """
+    if not isinstance(value, (bytes, bytearray)):
+        return None
+    data = bytes(value)
+    if len(data) < 24:
+        return None
+    data_length = struct.unpack("<H", data[0:2])[0]
+    rtype = struct.unpack("<H", data[2:4])[0]
+    ttl = struct.unpack(">I", data[12:16])[0]
+    payload = data[24 : 24 + data_length]
+    return {
+        "type": _DNS_RECORD_TYPES.get(rtype, f"TYPE{rtype}"),
+        "type_id": rtype,
+        "ttl": ttl,
+        "data": _decode_dns_data(rtype, payload),
+    }
+
+
+def decode_dns_records(value: Any) -> list[dict[str, Any]]:
+    """Decode a ``dnsRecord`` attribute (one value, or a list of values).
+
+    A ``dnsNode`` holds one ``dnsRecord`` value per resource record, so ldap3
+    may hand back either a single ``bytes`` or a list of them. Values that
+    cannot be decoded are skipped.
+    """
+    raw_values = value if isinstance(value, list) else [value]
+    out: list[dict[str, Any]] = []
+    for raw in raw_values:
+        decoded = decode_dns_record(raw)
+        if decoded is not None:
+            out.append(decoded)
+    return out
+
+
 # --- entry-level, non-destructive decode -----------------------------------
 
 #: Attributes that hold a Windows FILETIME and get an ``*_iso`` companion key.
@@ -241,6 +380,8 @@ def decode_entry(entry: LdapEntry) -> LdapEntry:
       :func:`decode_user_account_control` (when present and numeric).
     - ``groupType_decoded`` — the dict from :func:`decode_group_type`.
     - ``objectSid_decoded`` / ``objectGUID_decoded`` — canonical strings.
+    - ``dnsRecord_decoded`` — list of decoded DNS resource records (for
+      ``dnsNode`` objects), from :func:`decode_dns_records`.
     - ``<attr>_iso`` for each FILETIME attribute that decodes to a timestamp
       (a "never"/unset sentinel adds no key).
 
@@ -267,6 +408,11 @@ def decode_entry(entry: LdapEntry) -> LdapEntry:
         guid = decode_guid(entry["objectGUID"])
         if guid is not None:
             decoded["objectGUID_decoded"] = guid
+
+    if "dnsRecord" in entry:
+        records = decode_dns_records(entry["dnsRecord"])
+        if records:
+            decoded["dnsRecord_decoded"] = records
 
     for attr in _FILETIME_ATTRIBUTES:
         if attr in entry:

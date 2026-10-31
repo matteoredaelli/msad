@@ -382,6 +382,338 @@ def list_sites(
         return []
 
 
+#: Attributes worth surfacing for each AD subnet.
+DEFAULT_SUBNET_ATTRIBUTES = [
+    "cn",
+    "siteObject",
+    "location",
+    "description",
+    "whenCreated",
+    "distinguishedName",
+]
+
+
+def list_subnets(
+    conn: LdapConnection,
+    base: str,
+    *,
+    config_base: str | None = None,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """List the AD subnets (``objectClass=subnet``) from the Configuration NC.
+
+    Subnets live under ``CN=Subnets,CN=Sites,CN=Configuration,<forest root>``.
+    Each subnet's ``cn`` is its network prefix in CIDR form (e.g.
+    ``10.20.0.0/16``) and ``siteObject`` is the DN of the AD site it is
+    associated with. For a single-domain forest the Configuration NC is derived
+    from ``base``; pass ``config_base`` explicitly for a multi-domain forest.
+
+    Returns:
+        A list of subnet entries (default attributes if none given). Empty if
+        the Subnets container cannot be read.
+    """
+    config = config_base or _configuration_nc(base)
+    subnets = f"CN=Subnets,CN=Sites,{config}"
+    try:
+        return search(
+            conn,
+            subnets,
+            "(objectClass=subnet)",
+            limit=limit,
+            attributes=attributes or DEFAULT_SUBNET_ATTRIBUTES,
+        )
+    except LDAPExceptionError as exc:
+        logging.debug("list_subnets: cannot read %r: %s", subnets, exc)
+        return []
+
+
+#: Attributes worth surfacing for each site link.
+DEFAULT_SITE_LINK_ATTRIBUTES = [
+    "cn",
+    "description",
+    "cost",
+    "replInterval",
+    "siteList",
+    "whenCreated",
+    "distinguishedName",
+]
+
+
+def list_site_links(
+    conn: LdapConnection,
+    base: str,
+    *,
+    config_base: str | None = None,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """List AD site links (``objectClass=siteLink``) from the Configuration NC.
+
+    Site links live under ``CN=Inter-Site Transports,CN=Sites,CN=Configuration,
+    <forest root>`` (typically in the ``CN=IP`` transport). Each link's
+    ``siteList`` is the list of site DNs it connects, ``cost`` and
+    ``replInterval`` drive inter-site replication topology. For a single-domain
+    forest the Configuration NC is derived from ``base``; pass ``config_base``
+    explicitly for a multi-domain forest.
+
+    Returns:
+        A list of site-link entries (default attributes if none given). Empty if
+        the Inter-Site Transports container cannot be read.
+    """
+    config = config_base or _configuration_nc(base)
+    transports = f"CN=Inter-Site Transports,CN=Sites,{config}"
+    try:
+        return search(
+            conn,
+            transports,
+            "(objectClass=siteLink)",
+            limit=limit,
+            attributes=attributes or DEFAULT_SITE_LINK_ATTRIBUTES,
+        )
+    except LDAPExceptionError as exc:
+        logging.debug("list_site_links: cannot read %r: %s", transports, exc)
+        return []
+
+
+#: Attributes worth surfacing for each directory server (DC) object.
+DEFAULT_SERVER_ATTRIBUTES = [
+    "cn",
+    "dNSHostName",
+    "serverReference",
+    "whenCreated",
+    "distinguishedName",
+]
+
+
+def list_servers(
+    conn: LdapConnection,
+    base: str,
+    *,
+    config_base: str | None = None,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """List directory servers (``objectClass=server``) from the Configuration NC.
+
+    Server objects live under ``CN=Servers`` of each site, below
+    ``CN=Sites,CN=Configuration,<forest root>``. This is the site-centric view
+    of the forest's domain controllers: the parent of each ``server`` object is
+    its AD site, and ``serverReference`` links to the DC's computer object. For
+    a single-domain forest the Configuration NC is derived from ``base``; pass
+    ``config_base`` explicitly for a multi-domain forest.
+
+    Returns:
+        A list of server entries (default attributes if none given). Empty if
+        the Sites container cannot be read.
+    """
+    config = config_base or _configuration_nc(base)
+    sites = f"CN=Sites,{config}"
+    try:
+        return search(
+            conn,
+            sites,
+            "(objectClass=server)",
+            limit=limit,
+            attributes=attributes or DEFAULT_SERVER_ATTRIBUTES,
+        )
+    except LDAPExceptionError as exc:
+        logging.debug("list_servers: cannot read %r: %s", sites, exc)
+        return []
+
+
+#: Attributes worth surfacing for each AD-integrated DNS zone.
+DEFAULT_DNS_ZONE_ATTRIBUTES = [
+    "name",
+    "dc",
+    "whenCreated",
+    "whenChanged",
+    "distinguishedName",
+]
+
+
+def list_dns_zones(
+    conn: LdapConnection,
+    base: str,
+    *,
+    zone_base: str | None = None,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """List AD-integrated DNS zones (``objectClass=dnsZone``).
+
+    For AD-integrated DNS, zones are stored as LDAP objects in the application
+    partition ``DC=DomainDnsZones,<base>`` (and legacy zones under
+    ``CN=MicrosoftDNS,CN=System,<base>``). This queries ``DC=DomainDnsZones,
+    <base>`` by default; pass ``zone_base`` to target the forest-wide partition
+    (``DC=ForestDnsZones,<forest root>``) or the legacy System container.
+
+    Note: only AD-integrated zones live in the directory. File-backed zones are
+    not visible over LDAP.
+
+    Returns:
+        A list of DNS-zone entries (default attributes if none given). Empty if
+        the partition cannot be read.
+    """
+    zones = zone_base or f"DC=DomainDnsZones,{base}"
+    try:
+        return search(
+            conn,
+            zones,
+            "(objectClass=dnsZone)",
+            limit=limit,
+            attributes=attributes or DEFAULT_DNS_ZONE_ATTRIBUTES,
+        )
+    except LDAPExceptionError as exc:
+        logging.debug("list_dns_zones: cannot read %r: %s", zones, exc)
+        return []
+
+
+#: Attributes worth surfacing for each DNS resource-record node.
+DEFAULT_DNS_RECORD_ATTRIBUTES = [
+    "name",
+    "dnsRecord",
+    "dc",
+    "whenChanged",
+    "distinguishedName",
+]
+
+
+def list_dns_records(
+    conn: LdapConnection,
+    base: str,
+    zone: str,
+    *,
+    zone_base: str | None = None,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """List the DNS records (``objectClass=dnsNode``) of an AD-integrated zone.
+
+    Each ``dnsNode`` under the zone holds one or more binary ``dnsRecord``
+    values (the DNS_RPC_RECORD blob). The raw bytes are returned as-is; decode
+    them with :func:`msad.decode.decode_dns_records` (or run the whole result
+    set through :func:`msad.decode.decode_entries`, which adds a
+    ``dnsRecord_decoded`` companion key).
+
+    Args:
+        base: the domain naming context DN, used to locate the default zone
+            partition ``DC=DomainDnsZones,<base>``.
+        zone: the DNS zone name (e.g. ``example.com``); it becomes the
+            ``DC=<zone>`` search base within the partition.
+        zone_base: override the partition holding the zone (e.g.
+            ``DC=ForestDnsZones,<forest root>`` or the legacy
+            ``CN=MicrosoftDNS,CN=System,<base>``).
+
+    Returns:
+        A list of ``dnsNode`` entries (default attributes if none given). Empty
+        if the zone cannot be read.
+    """
+    partition = zone_base or f"DC=DomainDnsZones,{base}"
+    zone_dn = f"DC={zone},{partition}"
+    try:
+        return search(
+            conn,
+            zone_dn,
+            "(objectClass=dnsNode)",
+            limit=limit,
+            attributes=attributes or DEFAULT_DNS_RECORD_ATTRIBUTES,
+        )
+    except LDAPExceptionError as exc:
+        logging.debug("list_dns_records: cannot read %r: %s", zone_dn, exc)
+        return []
+
+
+#: Attributes worth surfacing for each authorized DHCP server.
+DEFAULT_DHCP_SERVER_ATTRIBUTES = [
+    "cn",
+    "dhcpServers",
+    "dhcpIdentification",
+    "whenCreated",
+    "distinguishedName",
+]
+
+
+def list_authorized_dhcp_servers(
+    conn: LdapConnection,
+    base: str,
+    *,
+    config_base: str | None = None,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """List DHCP servers authorized in AD (``objectClass=dHCPClass``).
+
+    DHCP authorization objects live under ``CN=NetServices,CN=Services,
+    CN=Configuration,<forest root>``. This reflects only which DHCP servers are
+    *authorized* in the directory; scopes, pools, leases and reservations are
+    held in each DHCP server's own database and are NOT exposed over LDAP. For a
+    single-domain forest the Configuration NC is derived from ``base``; pass
+    ``config_base`` explicitly for a multi-domain forest.
+
+    Returns:
+        A list of authorized-DHCP-server entries (default attributes if none
+        given). Empty if the NetServices container cannot be read.
+    """
+    config = config_base or _configuration_nc(base)
+    netservices = f"CN=NetServices,CN=Services,{config}"
+    try:
+        return search(
+            conn,
+            netservices,
+            "(objectClass=dHCPClass)",
+            limit=limit,
+            attributes=attributes or DEFAULT_DHCP_SERVER_ATTRIBUTES,
+        )
+    except LDAPExceptionError as exc:
+        logging.debug("list_authorized_dhcp_servers: cannot read %r: %s", netservices, exc)
+        return []
+
+
+#: Attributes worth surfacing for each DFS namespace root.
+DEFAULT_DFS_NAMESPACE_ATTRIBUTES = [
+    "cn",
+    "description",
+    "whenCreated",
+    "whenChanged",
+    "distinguishedName",
+]
+
+
+def list_dfs_namespaces(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """List domain-based DFS namespace roots (``objectClass=fTDfs``).
+
+    Domain-based DFS namespaces are stored under
+    ``CN=Dfs-Configuration,CN=System,<base>``; each namespace root is an
+    ``fTDfs`` object whose ``cn`` is the namespace name. The topology/links are
+    held in the binary ``pKT`` blob, which this function does not decode.
+    Stand-alone (server-based) DFS namespaces are not stored in AD and are not
+    visible here.
+
+    Returns:
+        A list of DFS namespace entries (default attributes if none given).
+        Empty if the Dfs-Configuration container cannot be read.
+    """
+    container = f"CN=Dfs-Configuration,CN=System,{base}"
+    try:
+        return search(
+            conn,
+            container,
+            "(objectClass=fTDfs)",
+            limit=limit,
+            attributes=attributes or DEFAULT_DFS_NAMESPACE_ATTRIBUTES,
+        )
+    except LDAPExceptionError as exc:
+        logging.debug("list_dfs_namespaces: cannot read %r: %s", container, exc)
+        return []
+
+
 #: Attributes worth surfacing for each Group Policy Object.
 DEFAULT_GPO_ATTRIBUTES = [
     "cn",
@@ -504,13 +836,20 @@ def list_fine_grained_password_policies(
 
 # escape_exact is re-exported for callers that build their own audit filters.
 __all__ = [
+    "DEFAULT_DFS_NAMESPACE_ATTRIBUTES",
+    "DEFAULT_DHCP_SERVER_ATTRIBUTES",
+    "DEFAULT_DNS_RECORD_ATTRIBUTES",
+    "DEFAULT_DNS_ZONE_ATTRIBUTES",
     "DEFAULT_DOMAIN_ATTRIBUTES",
     "DEFAULT_GPO_ATTRIBUTES",
     "DEFAULT_PASSWORD_POLICY_ATTRIBUTES",
     "DEFAULT_PRIVILEGED_GROUPS",
     "DEFAULT_PSO_ATTRIBUTES",
     "DEFAULT_PWD_VIOLATION_ATTRIBUTES",
+    "DEFAULT_SERVER_ATTRIBUTES",
     "DEFAULT_SITE_ATTRIBUTES",
+    "DEFAULT_SITE_LINK_ATTRIBUTES",
+    "DEFAULT_SUBNET_ATTRIBUTES",
     "DEFAULT_TRUST_ATTRIBUTES",
     "escape_exact",
     "get_domain_info",
@@ -518,9 +857,16 @@ __all__ = [
     "get_password_policy",
     "get_password_policy_violations",
     "get_privileged_groups",
+    "list_authorized_dhcp_servers",
+    "list_dfs_namespaces",
+    "list_dns_records",
+    "list_dns_zones",
     "list_fine_grained_password_policies",
     "list_fsmo_roles",
     "list_gpos",
+    "list_servers",
+    "list_site_links",
     "list_sites",
+    "list_subnets",
     "list_trusts",
 ]

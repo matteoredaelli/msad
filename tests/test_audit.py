@@ -238,6 +238,191 @@ def test_list_sites_respects_config_base(conn) -> None:
     assert conn.searches[-1].search_base == "CN=Sites,CN=Configuration,DC=example,DC=com"
 
 
+# --- Subnets ----------------------------------------------------------------
+
+
+def test_list_subnets_filter_and_base(conn, make_entry) -> None:
+    from msad.audit import DEFAULT_SUBNET_ATTRIBUTES, list_subnets
+
+    conn.queue(
+        [
+            make_entry(
+                {"cn": "10.20.0.0/16", "siteObject": "CN=Site-A,CN=Sites"},
+                dn="CN=10.20.0.0/16,CN=Subnets,CN=Sites",
+            )
+        ]
+    )
+    result = list_subnets(conn, "DC=example,DC=com")
+    last = conn.searches[-1]
+    assert last.search_base == "CN=Subnets,CN=Sites,CN=Configuration,DC=example,DC=com"
+    assert last.search_filter == "(objectClass=subnet)"
+    assert last.attributes == DEFAULT_SUBNET_ATTRIBUTES
+    assert result[0]["cn"] == "10.20.0.0/16"
+
+
+def test_list_subnets_respects_config_base(conn) -> None:
+    from msad.audit import list_subnets
+
+    conn.queue([])
+    list_subnets(
+        conn, "DC=child,DC=example,DC=com", config_base="CN=Configuration,DC=example,DC=com"
+    )
+    assert conn.searches[-1].search_base == "CN=Subnets,CN=Sites,CN=Configuration,DC=example,DC=com"
+
+
+# --- Site links -------------------------------------------------------------
+
+
+def test_list_site_links_filter_and_base(conn, make_entry) -> None:
+    from msad.audit import DEFAULT_SITE_LINK_ATTRIBUTES, list_site_links
+
+    conn.queue([make_entry({"cn": "DEFAULTIPSITELINK", "cost": 100}, dn="CN=...,CN=IP")])
+    result = list_site_links(conn, "DC=example,DC=com")
+    last = conn.searches[-1]
+    assert (
+        last.search_base == "CN=Inter-Site Transports,CN=Sites,CN=Configuration,DC=example,DC=com"
+    )
+    assert last.search_filter == "(objectClass=siteLink)"
+    assert last.attributes == DEFAULT_SITE_LINK_ATTRIBUTES
+    assert result[0]["cn"] == "DEFAULTIPSITELINK"
+
+
+def test_list_site_links_respects_config_base(conn) -> None:
+    from msad.audit import list_site_links
+
+    conn.queue([])
+    list_site_links(
+        conn, "DC=child,DC=example,DC=com", config_base="CN=Configuration,DC=example,DC=com"
+    )
+    assert (
+        conn.searches[-1].search_base
+        == "CN=Inter-Site Transports,CN=Sites,CN=Configuration,DC=example,DC=com"
+    )
+
+
+# --- Servers ----------------------------------------------------------------
+
+
+def test_list_servers_filter_and_base(conn, make_entry) -> None:
+    from msad.audit import DEFAULT_SERVER_ATTRIBUTES, list_servers
+
+    conn.queue(
+        [make_entry({"cn": "DC1", "dNSHostName": "dc1.example.com"}, dn="CN=DC1,CN=Servers")]
+    )
+    result = list_servers(conn, "DC=example,DC=com")
+    last = conn.searches[-1]
+    assert last.search_base == "CN=Sites,CN=Configuration,DC=example,DC=com"
+    assert last.search_filter == "(objectClass=server)"
+    assert last.attributes == DEFAULT_SERVER_ATTRIBUTES
+    assert result[0]["cn"] == "DC1"
+
+
+def test_list_servers_respects_config_base(conn) -> None:
+    from msad.audit import list_servers
+
+    conn.queue([])
+    list_servers(
+        conn, "DC=child,DC=example,DC=com", config_base="CN=Configuration,DC=example,DC=com"
+    )
+    assert conn.searches[-1].search_base == "CN=Sites,CN=Configuration,DC=example,DC=com"
+
+
+# --- DNS zones --------------------------------------------------------------
+
+
+def test_list_dns_zones_filter_and_base(conn, make_entry) -> None:
+    from msad.audit import DEFAULT_DNS_ZONE_ATTRIBUTES, list_dns_zones
+
+    conn.queue([make_entry({"name": "example.com"}, dn="DC=example.com,DC=DomainDnsZones")])
+    result = list_dns_zones(conn, "DC=example,DC=com")
+    last = conn.searches[-1]
+    assert last.search_base == "DC=DomainDnsZones,DC=example,DC=com"
+    assert last.search_filter == "(objectClass=dnsZone)"
+    assert last.attributes == DEFAULT_DNS_ZONE_ATTRIBUTES
+    assert result[0]["name"] == "example.com"
+
+
+def test_list_dns_zones_respects_zone_base(conn) -> None:
+    from msad.audit import list_dns_zones
+
+    conn.queue([])
+    list_dns_zones(conn, "DC=example,DC=com", zone_base="DC=ForestDnsZones,DC=example,DC=com")
+    assert conn.searches[-1].search_base == "DC=ForestDnsZones,DC=example,DC=com"
+
+
+# --- Authorized DHCP servers ------------------------------------------------
+
+
+def test_list_authorized_dhcp_servers_filter_and_base(conn, make_entry) -> None:
+    from msad.audit import DEFAULT_DHCP_SERVER_ATTRIBUTES, list_authorized_dhcp_servers
+
+    conn.queue([make_entry({"cn": "dhcp1"}, dn="CN=dhcp1,CN=NetServices")])
+    result = list_authorized_dhcp_servers(conn, "DC=example,DC=com")
+    last = conn.searches[-1]
+    assert last.search_base == "CN=NetServices,CN=Services,CN=Configuration,DC=example,DC=com"
+    assert last.search_filter == "(objectClass=dHCPClass)"
+    assert last.attributes == DEFAULT_DHCP_SERVER_ATTRIBUTES
+    assert result[0]["cn"] == "dhcp1"
+
+
+def test_list_authorized_dhcp_servers_respects_config_base(conn) -> None:
+    from msad.audit import list_authorized_dhcp_servers
+
+    conn.queue([])
+    list_authorized_dhcp_servers(
+        conn, "DC=child,DC=example,DC=com", config_base="CN=Configuration,DC=example,DC=com"
+    )
+    assert (
+        conn.searches[-1].search_base
+        == "CN=NetServices,CN=Services,CN=Configuration,DC=example,DC=com"
+    )
+
+
+# --- DNS records ------------------------------------------------------------
+
+
+def test_list_dns_records_filter_and_base(conn, make_entry) -> None:
+    from msad.audit import DEFAULT_DNS_RECORD_ATTRIBUTES, list_dns_records
+
+    conn.queue([make_entry({"name": "www", "dnsRecord": b"..."}, dn="DC=www,DC=example.com")])
+    result = list_dns_records(conn, "DC=example,DC=com", "example.com")
+    last = conn.searches[-1]
+    assert last.search_base == "DC=example.com,DC=DomainDnsZones,DC=example,DC=com"
+    assert last.search_filter == "(objectClass=dnsNode)"
+    assert last.attributes == DEFAULT_DNS_RECORD_ATTRIBUTES
+    assert result[0]["name"] == "www"
+
+
+def test_list_dns_records_respects_zone_base(conn) -> None:
+    from msad.audit import list_dns_records
+
+    conn.queue([])
+    list_dns_records(
+        conn,
+        "DC=example,DC=com",
+        "_msdcs.example.com",
+        zone_base="DC=ForestDnsZones,DC=example,DC=com",
+    )
+    assert (
+        conn.searches[-1].search_base == "DC=_msdcs.example.com,DC=ForestDnsZones,DC=example,DC=com"
+    )
+
+
+# --- DFS namespaces ---------------------------------------------------------
+
+
+def test_list_dfs_namespaces_filter_and_base(conn, make_entry) -> None:
+    from msad.audit import DEFAULT_DFS_NAMESPACE_ATTRIBUTES, list_dfs_namespaces
+
+    conn.queue([make_entry({"cn": "public"}, dn="CN=public,CN=Dfs-Configuration")])
+    result = list_dfs_namespaces(conn, "DC=example,DC=com")
+    last = conn.searches[-1]
+    assert last.search_base == "CN=Dfs-Configuration,CN=System,DC=example,DC=com"
+    assert last.search_filter == "(objectClass=fTDfs)"
+    assert last.attributes == DEFAULT_DFS_NAMESPACE_ATTRIBUTES
+    assert result[0]["cn"] == "public"
+
+
 # --- GPOs -------------------------------------------------------------------
 
 
