@@ -185,6 +185,16 @@ For Kerberos authentication, first obtain a ticket:
 kinit            # or: kinit myaduser
 ```
 
+> **Platform note — do you need `kinit`?** msad binds with SASL/GSSAPI and never
+> handles credentials itself; it relies on the system's Kerberos credential
+> cache. On **macOS/Linux** that cache is empty until you run `kinit` (or point
+> at a keytab via `KRB5_CLIENT_KTNAME`), so a ticket is required. On **Windows**,
+> GSSAPI maps to SSPI: a **domain-joined** machine running as a **domain user**
+> already has a ticket from the interactive logon, so usually **no `kinit` is
+> needed**. Windows still needs an explicit ticket/keytab (and correct
+> `ldap/<host>` SPN and DNS) when the host is not domain-joined, when running as
+> a local/service account, or in other contexts without a logon ticket.
+
 Verify connectivity and authentication before running other commands:
 
 ```bash
