@@ -622,6 +622,64 @@ def find_stale_computers(
     )
 
 
+def find_computers_by_os(
+    conn: LdapConnection,
+    base: str,
+    os: str,
+    *,
+    exclude_domain_controllers: bool = False,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find computers whose ``operatingSystem`` matches ``os``.
+
+    A convenience wrapper over :func:`find_computers` for OS-based inventory.
+    ``os`` may contain ``*`` wildcards, e.g. ``"Windows Server*"`` or
+    ``"*2012*"``.
+
+    Args:
+        base: the DN to search under (whole domain by default, or an OU).
+        os: the ``operatingSystem`` value to match (wildcards allowed).
+        exclude_domain_controllers: if True, exclude DCs (``primaryGroupID=516``).
+
+    Returns:
+        A list of matching computer entries (default attributes if none given).
+    """
+    return find_computers(
+        conn,
+        base,
+        os=os,
+        exclude_domain_controllers=exclude_domain_controllers,
+        limit=limit,
+        attributes=attributes,
+    )
+
+
+def find_disabled_computers(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find disabled computer accounts (``ACCOUNTDISABLE`` UAC flag, 0x2).
+
+    The computer counterpart of :func:`disabled_users`: matches computer
+    objects whose ``userAccountControl`` has the disable bit set.
+
+    Returns:
+        A list of disabled computer entries (default attributes if none given).
+    """
+    search_filter = "(&(objectClass=computer)(userAccountControl:1.2.840.113556.1.4.803:=2))"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_COMPUTER_ATTRIBUTES,
+    )
+
+
 def get_dn(conn: LdapConnection, base: str, entry: str) -> str | None:
     """Resolve an sAMAccountName (or DN) to a distinguished name.
 

@@ -486,6 +486,52 @@ def stale_computers(
 
 @app.command()
 @_handle_errors
+def computers_by_os(
+    os: str,
+    base: str | None = None,
+    exclude_domain_controllers: bool = False,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find computers whose operatingSystem matches OS (supports * wildcards)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_computers_by_os(
+        conn,
+        base or config.base,
+        os,
+        exclude_domain_controllers=exclude_domain_controllers,
+        limit=limit,
+        attributes=attributes,
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def disabled_computers(
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find disabled computer accounts (ACCOUNTDISABLE UAC flag)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_disabled_computers(
+        conn,
+        base or config.base,
+        limit=limit,
+        attributes=attributes,
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
 def contact_search(
     string: str | None = None,
     base: str | None = None,
@@ -834,6 +880,42 @@ def subnets(
         attributes=attributes,
     )
     print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def get_site(
+    identifier: str,
+    config_base: str | None = None,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Get a single AD site by its cn (name) (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.get_site(
+        conn, config.base, identifier, config_base=config_base, attributes=attributes
+    )
+    print(_pprint([result] if result else [], out_format))
+
+
+@app.command()
+@_handle_errors
+def get_subnet(
+    identifier: str,
+    config_base: str | None = None,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Get a single AD subnet by its cn (CIDR, e.g. 10.20.0.0/16) (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.get_subnet(
+        conn, config.base, identifier, config_base=config_base, attributes=attributes
+    )
+    print(_pprint([result] if result else [], out_format))
 
 
 @app.command()

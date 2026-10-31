@@ -382,6 +382,40 @@ def list_sites(
         return []
 
 
+def get_site(
+    conn: LdapConnection,
+    base: str,
+    identifier: str,
+    *,
+    config_base: str | None = None,
+    attributes: Attributes = None,
+) -> LdapEntry | None:
+    """Return a single AD site matched by its ``cn`` (name).
+
+    Sites live under ``CN=Sites,CN=Configuration,<forest root>``. Uses an exact
+    match on ``cn``. For a single-domain forest the Configuration NC is derived
+    from ``base``; pass ``config_base`` explicitly for a multi-domain forest.
+
+    Returns:
+        The site's attributes as a dict, or None if not found.
+    """
+    config = config_base or _configuration_nc(base)
+    sites = f"CN=Sites,{config}"
+    search_filter = f"(&(objectClass=site)(cn={escape_exact(identifier)}))"
+    try:
+        result = search(
+            conn,
+            sites,
+            search_filter,
+            limit=1,
+            attributes=attributes or DEFAULT_SITE_ATTRIBUTES,
+        )
+    except LDAPExceptionError as exc:
+        logging.debug("get_site(%r): cannot read %r: %s", identifier, sites, exc)
+        return None
+    return result[0] if result else None
+
+
 #: Attributes worth surfacing for each AD subnet.
 DEFAULT_SUBNET_ATTRIBUTES = [
     "cn",
@@ -426,6 +460,42 @@ def list_subnets(
     except LDAPExceptionError as exc:
         logging.debug("list_subnets: cannot read %r: %s", subnets, exc)
         return []
+
+
+def get_subnet(
+    conn: LdapConnection,
+    base: str,
+    identifier: str,
+    *,
+    config_base: str | None = None,
+    attributes: Attributes = None,
+) -> LdapEntry | None:
+    """Return a single AD subnet matched by its ``cn`` (CIDR prefix).
+
+    Subnets live under ``CN=Subnets,CN=Sites,CN=Configuration,<forest root>``;
+    the ``cn`` is the network prefix in CIDR form (e.g. ``10.20.0.0/16``). Uses
+    an exact match. For a single-domain forest the Configuration NC is derived
+    from ``base``; pass ``config_base`` explicitly for a multi-domain forest.
+
+    Returns:
+        The subnet's attributes as a dict (including ``siteObject``), or None if
+        not found.
+    """
+    config = config_base or _configuration_nc(base)
+    subnets = f"CN=Subnets,CN=Sites,{config}"
+    search_filter = f"(&(objectClass=subnet)(cn={escape_exact(identifier)}))"
+    try:
+        result = search(
+            conn,
+            subnets,
+            search_filter,
+            limit=1,
+            attributes=attributes or DEFAULT_SUBNET_ATTRIBUTES,
+        )
+    except LDAPExceptionError as exc:
+        logging.debug("get_subnet(%r): cannot read %r: %s", identifier, subnets, exc)
+        return None
+    return result[0] if result else None
 
 
 #: Attributes worth surfacing for each site link.
@@ -857,6 +927,8 @@ __all__ = [
     "get_password_policy",
     "get_password_policy_violations",
     "get_privileged_groups",
+    "get_site",
+    "get_subnet",
     "list_authorized_dhcp_servers",
     "list_dfs_namespaces",
     "list_dns_records",

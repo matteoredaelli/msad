@@ -18,6 +18,7 @@ Features:
 - [X] find inactive users / stale computers (last logon older than N days)
 - [X] audit reads: domain info, default password policy, privileged groups
 - [X] audit reads: FSMO role owners, domain trusts, AD sites, subnets, site links and servers
+- [X] get a single AD site or subnet; find computers by OS or disabled computer accounts
 - [X] audit reads: AD-integrated DNS zones and records (decoded A/AAAA/NS/CNAME/PTR/MX/SRV/SOA/TXT)
 - [X] audit reads: authorized DHCP servers and domain-based DFS namespaces
 - [X] audit reads: GPOs, fine-grained password policies (PSOs)
@@ -232,6 +233,12 @@ msad computer-search --exclude-domain-controllers
 # Get a single computer (sAMAccountName with or without trailing $, cn, or FQDN)
 msad computer-get PC001
 
+# Find computers by operating system (values may contain *)
+msad computers-by-os "Windows Server 2019*"
+
+# Find disabled computer accounts
+msad disabled-computers
+
 # Restrict any search to a specific OU subtree with --base
 msad user-search --surname "Rossi" --base "OU=Sales,DC=group,DC=example,DC=com"
 
@@ -322,6 +329,10 @@ msad privileged-groups --with-members --nested
 msad subnets
 msad site-links
 msad servers
+
+# Get a single site or subnet by name/CIDR
+msad get-site Default-First-Site-Name
+msad get-subnet 10.20.0.0/16
 
 # AD-integrated DNS: zones, and the (decoded) records of a zone
 msad dns-zones

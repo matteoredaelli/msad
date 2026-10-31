@@ -238,6 +238,27 @@ def test_list_sites_respects_config_base(conn) -> None:
     assert conn.searches[-1].search_base == "CN=Sites,CN=Configuration,DC=example,DC=com"
 
 
+def test_get_site_filter_and_base(conn, make_entry) -> None:
+    from msad.audit import DEFAULT_SITE_ATTRIBUTES, get_site
+
+    conn.queue([make_entry({"cn": "Site-A"}, dn="CN=Site-A,CN=Sites")])
+    result = get_site(conn, "DC=example,DC=com", "Site-A")
+    last = conn.searches[-1]
+    assert last.search_base == "CN=Sites,CN=Configuration,DC=example,DC=com"
+    assert "(objectClass=site)" in last.search_filter
+    assert "(cn=Site-A)" in last.search_filter
+    assert last.attributes == DEFAULT_SITE_ATTRIBUTES
+    assert result is not None
+    assert result["cn"] == "Site-A"
+
+
+def test_get_site_returns_none_when_absent(conn) -> None:
+    from msad.audit import get_site
+
+    conn.queue([])
+    assert get_site(conn, "DC=example,DC=com", "Nope") is None
+
+
 # --- Subnets ----------------------------------------------------------------
 
 
@@ -268,6 +289,34 @@ def test_list_subnets_respects_config_base(conn) -> None:
         conn, "DC=child,DC=example,DC=com", config_base="CN=Configuration,DC=example,DC=com"
     )
     assert conn.searches[-1].search_base == "CN=Subnets,CN=Sites,CN=Configuration,DC=example,DC=com"
+
+
+def test_get_subnet_filter_and_base(conn, make_entry) -> None:
+    from msad.audit import DEFAULT_SUBNET_ATTRIBUTES, get_subnet
+
+    conn.queue(
+        [
+            make_entry(
+                {"cn": "10.20.0.0/16", "siteObject": "CN=Site-A,CN=Sites"},
+                dn="CN=10.20.0.0/16,CN=Subnets,CN=Sites",
+            )
+        ]
+    )
+    result = get_subnet(conn, "DC=example,DC=com", "10.20.0.0/16")
+    last = conn.searches[-1]
+    assert last.search_base == "CN=Subnets,CN=Sites,CN=Configuration,DC=example,DC=com"
+    assert "(objectClass=subnet)" in last.search_filter
+    assert "(cn=10.20.0.0/16)" in last.search_filter
+    assert last.attributes == DEFAULT_SUBNET_ATTRIBUTES
+    assert result is not None
+    assert result["siteObject"] == "CN=Site-A,CN=Sites"
+
+
+def test_get_subnet_returns_none_when_absent(conn) -> None:
+    from msad.audit import get_subnet
+
+    conn.queue([])
+    assert get_subnet(conn, "DC=example,DC=com", "10.0.0.0/8") is None
 
 
 # --- Site links -------------------------------------------------------------

@@ -11,7 +11,9 @@ from msad.search import (
     disabled_users,
     find_admin_count_accounts,
     find_computers,
+    find_computers_by_os,
     find_contacts,
+    find_disabled_computers,
     find_distribution_groups,
     find_empty_ous,
     find_expired_accounts,
@@ -228,6 +230,34 @@ def test_get_computer_keeps_existing_dollar(conn) -> None:
 def test_get_computer_none_when_absent(conn) -> None:
     conn.queue([])
     assert get_computer(conn, "dc=x", "nope") is None
+
+
+def test_find_computers_by_os_filter(conn) -> None:
+    conn.queue([])
+    find_computers_by_os(conn, "dc=x", "Windows Server*")
+    f = conn.searches[-1].search_filter
+    assert "(objectClass=computer)" in f
+    assert "(operatingSystem=Windows Server*)" in f
+    assert "primaryGroupID=516" not in f  # DCs not excluded by default
+
+
+def test_find_computers_by_os_excludes_dcs(conn) -> None:
+    conn.queue([])
+    find_computers_by_os(conn, "dc=x", "*2012*", exclude_domain_controllers=True)
+    f = conn.searches[-1].search_filter
+    assert "(operatingSystem=*2012*)" in f
+    assert "(!(primaryGroupID=516))" in f
+
+
+def test_find_disabled_computers_filter(conn) -> None:
+    from msad.search import DEFAULT_COMPUTER_ATTRIBUTES
+
+    conn.queue([])
+    find_disabled_computers(conn, "dc=x")
+    last = conn.searches[-1]
+    assert "(objectClass=computer)" in last.search_filter
+    assert "userAccountControl:1.2.840.113556.1.4.803:=2" in last.search_filter
+    assert last.attributes == DEFAULT_COMPUTER_ATTRIBUTES
 
 
 def test_find_ous_filters_and_class(conn) -> None:
