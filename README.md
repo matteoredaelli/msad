@@ -52,16 +52,21 @@ Group lookups include `managedBy` (owner DN), `member`, `groupType` and
 Python >= 3.11
 
 For Kerberos authentication, install the optional `kerberos` extra
-(`msad[kerberos]`), which pulls in the `gssapi` package. `gssapi` is a native
-extension and needs system Kerberos headers to build:
+(`msad[kerberos]`). It installs a different backend per platform:
 
-- krb5 library and tools (like `kinit`, ...)
-- krb5 dev headers: `libkrb5-dev` on Debian/Ubuntu, `krb5-devel` on
-  RHEL/Fedora, or `krb5` via Homebrew on macOS
-- a keytab file or `krb5.conf` configured
+- **macOS/Linux**: the `gssapi` package, a native extension that needs
+  system Kerberos headers to build:
+  - krb5 library and tools (like `kinit`, ...)
+  - krb5 dev headers: `libkrb5-dev` on Debian/Ubuntu, `krb5-devel` on
+    RHEL/Fedora, or `krb5` via Homebrew on macOS
+  - a keytab file or `krb5.conf` configured
+- **Windows**: the `winkerberos` package instead — a prebuilt wheel, no
+  system headers or separate Kerberos install needed. It wraps native SSPI
+  directly, so a domain-joined machine logged in as a domain user already
+  has everything it needs.
 
 If you only authenticate with user/password, skip the `kerberos` extra
-entirely \u2014 no native build, no system headers needed.
+entirely — no native build, no system headers needed.
 
 ## Installation
 
@@ -186,27 +191,29 @@ For Kerberos authentication, first obtain a ticket:
 kinit            # or: kinit myaduser
 ```
 
-> **Platform note — do you need `kinit`?** msad binds with SASL/GSSAPI via
-> the [`gssapi`](https://pypi.org/project/gssapi/) package and never handles
-> credentials itself; it relies on the system's Kerberos credential cache. On
-> **macOS/Linux** that cache is empty until you run `kinit` (or point at a
-> keytab via `KRB5_CLIENT_KTNAME`), so a ticket is required.
+> **Platform note — do you need `kinit`?** msad's `kerberos` extra installs
+> a different SASL/GSSAPI backend per platform (see `pyproject.toml`), and
+> never handles credentials itself; it relies on whichever Kerberos
+> credential store that backend uses.
 >
-> On **Windows**, `gssapi`'s wheel bundles its own **MIT Kerberos for
-> Windows** libraries — a separate Kerberos stack from the native Windows
-> logon session (SSPI/LSA) — so it does **not** automatically pick up the
-> domain user's interactive-logon ticket. By default you still need an
-> explicit `kinit` (any MIT Kerberos for Windows install provides the
-> `kinit`/`klist` binaries). To read the logon session's ticket instead
-> (SSO-like behavior, no `kinit` needed), MIT Kerberos supports a special
-> `MSLSA:` credential-cache type that reads tickets straight from the Windows
-> credential store; set `KRB5CCNAME=MSLSA:` before running msad. This has not
-> been verified end-to-end against a real AD on Windows by this project, so
-> treat it as a starting point rather than a guarantee. The alternative,
-> `winkerberos`, wraps native SSPI directly and would give true SSO without
-> any cache configuration, but msad's `kerberos` extra does not currently
-> depend on it (`ldap3` only tries `winkerberos` when `gssapi` is not
-> importable, so installing it alongside `gssapi` would have no effect).
+> On **macOS/Linux**, the extra installs [`gssapi`](https://pypi.org/project/gssapi/),
+> which relies on the system's Kerberos credential cache. That cache is
+> empty until you run `kinit` (or point at a keytab via
+> `KRB5_CLIENT_KTNAME`), so a ticket is required.
+>
+> On **Windows**, the extra installs [`winkerberos`](https://pypi.org/project/winkerberos/)
+> instead (no `gssapi`): it wraps native **SSPI** directly, so a
+> **domain-joined** machine running as a **domain user** gets real SSO from
+> the already-cached logon ticket — no `kinit`, no cache configuration.
+> Windows still needs an explicit ticket when the host is not domain-joined,
+> when running as a local/service account, or in other contexts without a
+> logon ticket. This has not been verified end-to-end against a real AD on
+> Windows by this project (no Windows host was available to test against),
+> so validate it yourself with `msad test-connection` / `msad whoami` after
+> installing. If you install `gssapi` manually on Windows anyway, note that
+> `ldap3` only falls back to `winkerberos` when `gssapi` is *not* importable
+> — having both installed would silently keep using `gssapi`'s own bundled,
+> non-native Kerberos stack instead of SSPI.
 
 Verify connectivity and authentication before running other commands:
 

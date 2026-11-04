@@ -65,14 +65,28 @@ Note `load_domain_config()` (TOML only, no env layer) still exists and is
 what the CLI (`main.py`) uses — it resolves `--domain`/`--config-file` from
 Typer flags, not environment variables, so it doesn't need the env layer.
 
-## Kerberos is an optional extra
+## Kerberos is an optional extra, split per platform
 
-`gssapi` lives under `[project.optional-dependencies] kerberos`, not in the
-base `dependencies`. It's a native extension that needs system Kerberos dev
-headers to build — do not move it back to a hard dependency. If you add code
-that imports `gssapi` directly (rather than relying on `ldap3`'s lazy
-import), guard it and raise a clear `MsadConnectionError` pointing at
-`msad[kerberos]`, matching the existing pattern in `connection.py`.
+The `kerberos` extra (`[project.optional-dependencies]`) installs a
+different backend depending on `sys_platform`, via PEP 508 markers:
+
+- macOS/Linux: `gssapi`. A native extension that needs system Kerberos dev
+  headers to build.
+- Windows: `winkerberos` instead. Prebuilt wheels, no system headers
+  needed, and it wraps native SSPI directly so a domain-joined machine
+  running as a domain user gets real SSO (uses the already-cached logon
+  ticket; no `kinit`/`KRB5CCNAME` needed).
+
+**Do not add `gssapi` as an unconditional/base dependency, and do not add
+`winkerberos` for non-Windows platforms.** `ldap3`'s own SASL/GSSAPI code
+(`ldap3.protocol.sasl.kerberos`) tries `import gssapi` first and only falls
+back to `winkerberos` when that import fails — so if both ended up
+installed on Windows, `gssapi`'s bundled (non-native) MIT Kerberos stack
+would silently win over native SSPI, defeating the point. If you add code
+that imports `gssapi` or `winkerberos` directly (rather than relying on
+`ldap3`'s lazy import), guard it per-platform and raise a clear
+`MsadConnectionError` pointing at `msad[kerberos]`, matching the existing
+pattern in `connection.py`.
 
 ## Testing conventions
 

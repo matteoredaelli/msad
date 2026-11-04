@@ -81,8 +81,10 @@ def connect(config: DomainConfig) -> LdapConnection:
         raise MsadConnectionError(
             "Kerberos authentication requires the optional 'kerberos' extra "
             "(install with `pip install msad[kerberos]` or "
-            "`uv tool install 'msad[kerberos]'`; it needs the system Kerberos "
-            f"dev headers to build). Original error: {exc}"
+            "`uv tool install 'msad[kerberos]'`). On macOS/Linux this pulls in "
+            "'gssapi', which needs the system Kerberos dev headers to build; "
+            "on Windows it pulls in 'winkerberos' instead (prebuilt wheel, no "
+            f"system headers needed). Original error: {exc}"
         ) from exc
     except LDAPExceptionError as exc:
         raise MsadConnectionError(f"Could not connect to {target} ({auth}): {exc}") from exc

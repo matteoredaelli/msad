@@ -322,16 +322,10 @@ sdist = { url = "https://files.pythonhosted.org/packages/6b/fb/9492eb37b5786369b
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4b/c5/abbccc9f3c7efaef68efbb8f2dbcebb610dc6631fd1108556dd2a9d967b4/gssapi-1.12.0-cp311-abi3-macosx_10_9_x86_64.whl", hash = "sha256:fbcf4213d72bde6f836dc96511d7410c4c95e0470ccc690bc7f85e402c9ff5ec", size = 644184, upload-time = "2026-08-26T03:00:23.018Z" },
     { url = "https://files.pythonhosted.org/packages/f3/3d/14bb64c34a1cb1ad6dd86dfdb2d50f2dd9719799edaf5c0a624efbe79a3f/gssapi-1.12.0-cp311-abi3-macosx_11_0_arm64.whl", hash = "sha256:ca29e1d31a6edd78d33ec37d0cf7bfde7e259b376051f742816c08380e23e973", size = 676810, upload-time = "2026-08-26T03:00:24.746Z" },
-    { url = "https://files.pythonhosted.org/packages/35/3d/d5f0c7b04c57a1701e664cc50eea88d1c91b876ea7f4b8505aab990210bc/gssapi-1.12.0-cp311-abi3-win32.whl", hash = "sha256:06f3363a5d201cf328e4964e491c37b0777636d67ef19549bbb96792b7293dca", size = 1588670, upload-time = "2026-08-26T03:00:26.438Z" },
-    { url = "https://files.pythonhosted.org/packages/3e/4e/ae027a2e7578a879f476ab0728f32cef86580df05ca56ca1e1918ecb61e8/gssapi-1.12.0-cp311-abi3-win_amd64.whl", hash = "sha256:a953e21f80169bd55fef0d0bf050109ce93d055931558c3b353e8c4e7751f08e", size = 1751663, upload-time = "2026-08-26T03:00:28.267Z" },
     { url = "https://files.pythonhosted.org/packages/db/5b/22d5bb1b687b1c8c2a12b708299ab041d2b9bc2ae30bbaa527989d94bb4a/gssapi-1.12.0-cp314-cp314t-macosx_10_15_x86_64.whl", hash = "sha256:82fa870b03277494d351912d2f48f55bd305fdc28953dd9c5fd3d82f07bf00c9", size = 761179, upload-time = "2026-08-26T03:00:29.801Z" },
     { url = "https://files.pythonhosted.org/packages/79/17/ec335f3c3ed42b81c343ef11b71212a4378635029433a7fe23801d526779/gssapi-1.12.0-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:ada649cbca078a8c2fb398257c93e66f4807a988d6ad36f8bb12744fb21aaf5a", size = 779738, upload-time = "2026-08-26T03:00:31.303Z" },
-    { url = "https://files.pythonhosted.org/packages/cc/21/bf546a0862c0e829beabd8fe337ed0255b2d434575e60ffc61182d8663b3/gssapi-1.12.0-cp314-cp314t-win32.whl", hash = "sha256:89d747b301317e9ab2d5776eafa9bb5e1b37a736bf295eb789aeb57752f23fb0", size = 1783923, upload-time = "2026-08-26T03:00:32.855Z" },
-    { url = "https://files.pythonhosted.org/packages/f1/a9/5006c8dce263b01708d024c25680b0648b294d6e36f1d56c2d797b52c3cb/gssapi-1.12.0-cp314-cp314t-win_amd64.whl", hash = "sha256:59c601325789d9aa34f14117f534f224031de455174ac01b64b7bbbdff6d2bd0", size = 1978925, upload-time = "2026-08-26T03:00:34.623Z" },
     { url = "https://files.pythonhosted.org/packages/12/e2/78321a281815e6e3078f8738539739c6a9f606e2f09f568711ab4bff21cd/gssapi-1.12.0-cp315-cp315t-macosx_10_15_x86_64.whl", hash = "sha256:9d98f9ad2327ab20d7985d0fd413c02c0cce7459ed226952fd078b29c6a2a40b", size = 750982, upload-time = "2026-08-26T03:00:36.208Z" },
     { url = "https://files.pythonhosted.org/packages/47/91/78d098549eea3358e1e8e6a76f254be2e9ac3c6e7117c81edf880e51b9ab/gssapi-1.12.0-cp315-cp315t-macosx_11_0_arm64.whl", hash = "sha256:6e2bf66d0d02e6cafadc9dc944998a9c2edcd553138b9c68b57236bcc827bd15", size = 769098, upload-time = "2026-08-26T03:00:38.419Z" },
-    { url = "https://files.pythonhosted.org/packages/63/a7/370654dd4c0f2400358bd4e68523814932a80503f210dd1426f09fc9d382/gssapi-1.12.0-cp315-cp315t-win32.whl", hash = "sha256:8b6c966d70025e044aa1f67d4e333854aa5e426ac2a75f201f627ede6aacf0c9", size = 1772974, upload-time = "2026-08-26T03:00:39.974Z" },
-    { url = "https://files.pythonhosted.org/packages/f3/eb/d4cc099a600fe07ccf91af52458c910894c87283f259ec8d3a0c63f33bf3/gssapi-1.12.0-cp315-cp315t-win_amd64.whl", hash = "sha256:4f0811ba2df74bb600697d5af5db7e5aecf9361f8081998d7c2cee3f5e59c752", size = 1960691, upload-time = "2026-08-26T03:00:41.737Z" },
 ]
 
 [[package]]
@@ -389,7 +383,8 @@ dependencies = [
 
 [package.optional-dependencies]
 kerberos = [
-    { name = "gssapi" },
+    { name = "gssapi", marker = "sys_platform != 'win32'" },
+    { name = "winkerberos", marker = "sys_platform == 'win32'" },
 ]
 
 [package.dev-dependencies]
@@ -403,11 +398,12 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "cryptography", specifier = "==50.0.1" },
-    { name = "gssapi", marker = "extra == 'kerberos'", specifier = "==1.12.0" },
+    { name = "gssapi", marker = "sys_platform != 'win32' and extra == 'kerberos'", specifier = "==1.12.0" },
     { name = "ldap3", specifier = "==2.9.1" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "pydantic-settings", specifier = ">=2.5" },
     { name = "typer", specifier = "==0.27.2" },
+    { name = "winkerberos", marker = "sys_platform == 'win32' and extra == 'kerberos'", specifier = ">=0.13.0" },
 ]
 provides-extras = ["kerberos"]
 
@@ -789,4 +785,22 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a3/26/b09b8010994eccc3c09092e6b34058f36a460eea2d4c3e8b910c695975a0/typing_inspection-0.4.4.tar.gz", hash = "sha256:547274fa6b0a561ccf549cc9524b999a578e737d015d8709d021f9d0d13bea47", size = 76928, upload-time = "2026-08-12T12:37:25.997Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/67/81/4add07e5172b7ac40d8ed5ff580409a7801a4fe26d529bdd915401dabfbe/typing_inspection-0.4.4-py3-none-any.whl", hash = "sha256:65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147", size = 14750, upload-time = "2026-08-12T12:37:24.648Z" },
+]
+
+[[package]]
+name = "winkerberos"
+version = "0.13.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ca/6c/455f043bc28694a278125d1fc2ab7cbf0ce0953c97bbe1021f08fd19c7b8/winkerberos-0.13.0.tar.gz", hash = "sha256:f3fbb67346fe8ed697e125724b0699d5c2a15b9a5f9151d25a1be88df8dac427", size = 35677, upload-time = "2025-12-03T14:17:29.882Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ce/09/05c4d2fb93f5478fd1b6146c4fa3fbb80839576a34062e5677f2dec3a430/winkerberos-0.13.0-cp311-cp311-win32.whl", hash = "sha256:a23c83854650416545000c4630e94b16fa14c7b400bd5f08a79718e04eff9135", size = 25642, upload-time = "2025-12-03T14:17:17.42Z" },
+    { url = "https://files.pythonhosted.org/packages/6e/5b/bafa1cfb9f047be139ffae330f6eafa0487f8bf82164ead756e0bc2bc047/winkerberos-0.13.0-cp311-cp311-win_amd64.whl", hash = "sha256:6bc03e66a737bfd11964e6cdc5f03a8cd0baed798f991b1467075c65980c4157", size = 27931, upload-time = "2025-12-03T14:17:18.708Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/fa/02de79d7dbec9122a6778678ed432ebffb228c48b16cfba3007c45a6e8fd/winkerberos-0.13.0-cp312-cp312-win32.whl", hash = "sha256:3454b8bb9c11091e4775a8bd692dfbe45f2eab12f3a4837b820c2505088dfdd2", size = 25675, upload-time = "2025-12-03T14:17:20.052Z" },
+    { url = "https://files.pythonhosted.org/packages/52/c2/ff9074cf423d82bdfb48ac89e64f360533ba4e2079e8485be8377a8c54fe/winkerberos-0.13.0-cp312-cp312-win_amd64.whl", hash = "sha256:59f01879c62adcda5af857fd78d2b2dfdfd99cf6179b92d38e2f2bd12db75bf7", size = 27946, upload-time = "2025-12-03T14:17:21.22Z" },
+    { url = "https://files.pythonhosted.org/packages/92/83/b1f52594cc2c3ce18c67a04aecb0cb4fb3f4769c268d194cc5f4863150fa/winkerberos-0.13.0-cp313-cp313-win32.whl", hash = "sha256:38fefdfc77a7f82c3cc9f83c7d1b6f242e6d3ea200bfde9b640f7dfe9fdf9bda", size = 25671, upload-time = "2025-12-03T14:17:23.235Z" },
+    { url = "https://files.pythonhosted.org/packages/9c/26/b17649b0707e4d8cd9d0d4ceadcef06eff2fc76fcb444cb187763158ae63/winkerberos-0.13.0-cp313-cp313-win_amd64.whl", hash = "sha256:c45e84a35a3b87b88d0e6d7b55d40712dc021f80af3cb9e81091651e6a73510d", size = 27941, upload-time = "2025-12-03T14:17:24.627Z" },
+    { url = "https://files.pythonhosted.org/packages/80/d9/d12d310fdf9ace70f7469ecfd9f112dc39cb7e1f77348228c06a6bd72c57/winkerberos-0.13.0-cp314-cp314-win32.whl", hash = "sha256:46cc29fa95744076a0dd2a167158574826509a5e4aa052b81a2b535aab4af14a", size = 26185, upload-time = "2025-12-03T14:17:25.63Z" },
+    { url = "https://files.pythonhosted.org/packages/97/7c/5a418e8d292e3fea1012ccf029b38fae430542fab1beaf6fc60cf138cc08/winkerberos-0.13.0-cp314-cp314-win_amd64.whl", hash = "sha256:5d5add54d10e31671f7c28c90ccafe98b45cec6d7519949ba30add51e34aee9a", size = 28476, upload-time = "2025-12-03T14:17:26.629Z" },
+    { url = "https://files.pythonhosted.org/packages/29/ba/cd8186479046b7a749cee8d4d9fd50e3ce3330d8ea611efe4b8b741f0c3b/winkerberos-0.13.0-cp314-cp314t-win32.whl", hash = "sha256:5bc5e40a816d94d4a5abd665fe62088c1ee91ee9a1f5d787032a63004842fedf", size = 26500, upload-time = "2025-12-03T14:17:27.873Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/a6/cc5f24b3f1a46a826b7e30ef56fdc1fe22315fef96de8e22afbdd5d98e7a/winkerberos-0.13.0-cp314-cp314t-win_amd64.whl", hash = "sha256:441884c0bda4bee0125fdbd7fee6a232dab58b4a64be8950eb17a8a7404a5440", size = 28715, upload-time = "2025-12-03T14:17:28.813Z" },
 ]

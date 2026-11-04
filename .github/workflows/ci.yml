@@ -36,7 +36,10 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --group dev --python ${{ matrix.python-version }}
+        run: uv sync --extra kerberos --group dev --python ${{ matrix.python-version }}
+
+      - name: Kerberos extra sanity check (gssapi importable on Linux)
+        run: uv run python -c "import gssapi; print('gssapi OK')"
 
       - name: ruff check
         run: make lint-check
@@ -50,9 +53,46 @@ jobs:
       - name: Test (pytest + coverage)
         run: make test
 
+  test-windows:
+    name: Lint & test (Windows, py${{ matrix.python-version }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies (incl. kerberos extra)
+        # No system Kerberos headers needed on Windows: winkerberos ships a
+        # prebuilt wheel (see pyproject.toml's per-platform kerberos extra).
+        run: uv sync --extra kerberos --group dev --python ${{ matrix.python-version }}
+
+      - name: Kerberos extra sanity check (winkerberos installed, not gssapi)
+        run: |
+          uv run python -c "import winkerberos; print('winkerberos OK')"
+          uv run python -c "
+          try:
+              import gssapi
+              raise SystemExit('gssapi should NOT be installed on Windows')
+          except ImportError:
+              print('gssapi correctly absent on Windows')
+          "
+
+      - name: Test (pytest)
+        run: uv run pytest
+
   build:
     name: Build distribution
-    needs: test
+    needs: [test, test-windows]
     # Only build when it's useful: on tag pushes (releases) or manual runs.
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest

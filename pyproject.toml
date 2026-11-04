@@ -28,12 +28,23 @@ license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 
 [project.optional-dependencies]
-# Kerberos (SASL/GSSAPI) authentication. Requires system Kerberos dev headers
-# to build (e.g. libkrb5-dev on Debian/Ubuntu, krb5-devel on RHEL/Fedora, or
-# krb5 via Homebrew on macOS). Skip this extra if you only use user/password
-# bind.
+# Kerberos (SASL) authentication, split per platform so each OS gets the
+# right backend and ldap3's own gssapi/winkerberos fallback (see
+# ldap3.protocol.sasl.kerberos) picks up the one we actually installed:
+# - macOS/Linux: gssapi. Requires system Kerberos dev headers to build
+#   (e.g. libkrb5-dev on Debian/Ubuntu, krb5-devel on RHEL/Fedora, or krb5
+#   via Homebrew on macOS).
+# - Windows: winkerberos. Prebuilt wheels, no system headers needed; it
+#   wraps native SSPI directly, so a domain-joined machine running as a
+#   domain user gets real SSO (the already-cached logon ticket is used, no
+#   kinit/KRB5CCNAME needed). Do NOT also install gssapi on Windows: ldap3
+#   only falls back to winkerberos when gssapi is NOT importable, so having
+#   both installed would silently keep using gssapi's bundled MIT Kerberos
+#   stack instead of native SSPI.
+# Skip this extra entirely if you only use user/password bind.
 kerberos = [
-    "gssapi==1.12.0",
+    "gssapi==1.12.0; sys_platform != 'win32'",
+    "winkerberos>=0.13.0; sys_platform == 'win32'",
 ]
 
 [project.urls]
