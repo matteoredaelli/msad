@@ -180,32 +180,26 @@ msad test-connection --domain lab    # check connectivity to a specific domain
 
 ### Connecting to the Global Catalog
 
-The Global Catalog (GC) is a separate LDAP listener (port `3268` plain,
-`3269` SSL) that every domain controller in a **multi-domain forest** also
-serves. It holds a partial-attribute replica of *every* domain in the
-forest, not just the one hosted by that DC — so a single GC query can find
-objects (mostly users, groups, computers) across all domains without
-chasing referrals, as long as you search with an empty/root base DN (or a
-forest-wide container, not a domain-specific one) and only ask for the
-attributes that are part of the GC's partial set (indexed, commonly-searched
-attributes; some less common ones aren't replicated to the GC).
+The Global Catalog (GC) listens on port `3268` (plain) / `3269` (SSL). In a
+**multi-domain forest** it replicates a partial attribute set of *every*
+domain, so one query can span the whole forest without chasing referrals —
+search with an empty/root `base`:
 
 ```toml
 [domains.corp-gc]
 host = "dc.corp.example.com"
-base = ""                 # empty/root base: search the whole forest via GC
+base = ""        # empty/root base: search the whole forest via GC
 port = 3269
 use_ssl = true
 ```
 
-In a **single-domain forest**, the GC shows nothing a normal LDAP query
-doesn't already: there's only one domain to replicate, and
-`namingContexts` on the GC's rootDSE will list the same naming contexts as
-port 389/636. The GC also never exposes data from a *trusted* forest (see
-`msad trusts`) — trust relationships enable cross-forest
-authentication/authorization, not data federation; to query a trusted
-forest's own objects you need to connect to one of its own DCs/GCs
-separately.
+- **Single-domain forest**: no difference from a normal query — there's
+  only one domain to replicate.
+- **Trusted forests** (`msad trusts`) are never visible via the GC: trusts
+  enable cross-forest auth, not data federation. Query that forest's own
+  DC/GC directly instead.
+- Only indexed, commonly-searched attributes are part of the GC's partial
+  set; some less common ones won't come back.
 
 ## Usage
 
@@ -220,29 +214,18 @@ For Kerberos authentication, first obtain a ticket:
 kinit            # or: kinit myaduser
 ```
 
-> **Platform note — do you need `kinit`?** msad's `kerberos` extra installs
-> a different SASL/GSSAPI backend per platform (see `pyproject.toml`), and
-> never handles credentials itself; it relies on whichever Kerberos
-> credential store that backend uses.
+> **Kerberos ticket per platform.** msad's `kerberos` extra installs a
+> different backend (see [Prerequisites](#prerequisites)): `gssapi` on
+> macOS/Linux, `winkerberos` on Windows.
 >
-> On **macOS/Linux**, the extra installs [`gssapi`](https://pypi.org/project/gssapi/),
-> which relies on the system's Kerberos credential cache. That cache is
-> empty until you run `kinit` (or point at a keytab via
-> `KRB5_CLIENT_KTNAME`), so a ticket is required.
->
-> On **Windows**, the extra installs [`winkerberos`](https://pypi.org/project/winkerberos/)
-> instead (no `gssapi`): it wraps native **SSPI** directly, so a
-> **domain-joined** machine running as a **domain user** gets real SSO from
-> the already-cached logon ticket — no `kinit`, no cache configuration.
-> Windows still needs an explicit ticket when the host is not domain-joined,
-> when running as a local/service account, or in other contexts without a
-> logon ticket. This has not been verified end-to-end against a real AD on
-> Windows by this project (no Windows host was available to test against),
-> so validate it yourself with `msad test-connection` / `msad whoami` after
-> installing. If you install `gssapi` manually on Windows anyway, note that
-> `ldap3` only falls back to `winkerberos` when `gssapi` is *not* importable
-> — having both installed would silently keep using `gssapi`'s own bundled,
-> non-native Kerberos stack instead of SSPI.
+> - **macOS/Linux**: `kinit` is required first — the credential cache is
+>   empty otherwise (or point at a keytab via `KRB5_CLIENT_KTNAME`).
+> - **Windows**: `winkerberos` wraps native SSPI, so a domain-joined
+>   machine logged in as a domain user gets SSO automatically — no `kinit`
+>   needed. *Not verified end-to-end against a real AD on Windows by this
+>   project* — validate it yourself with `msad test-connection` / `whoami`.
+> - Installing `gssapi` manually on Windows anyway disables this: `ldap3`
+>   only uses `winkerberos` when `gssapi` is not importable.
 
 Verify connectivity and authentication before running other commands:
 
