@@ -178,6 +178,35 @@ msad user-get jdoe --domain lab      # runs against the lab domain
 msad test-connection --domain lab    # check connectivity to a specific domain
 ```
 
+### Connecting to the Global Catalog
+
+The Global Catalog (GC) is a separate LDAP listener (port `3268` plain,
+`3269` SSL) that every domain controller in a **multi-domain forest** also
+serves. It holds a partial-attribute replica of *every* domain in the
+forest, not just the one hosted by that DC — so a single GC query can find
+objects (mostly users, groups, computers) across all domains without
+chasing referrals, as long as you search with an empty/root base DN (or a
+forest-wide container, not a domain-specific one) and only ask for the
+attributes that are part of the GC's partial set (indexed, commonly-searched
+attributes; some less common ones aren't replicated to the GC).
+
+```toml
+[domains.corp-gc]
+host = "dc.corp.example.com"
+base = ""                 # empty/root base: search the whole forest via GC
+port = 3269
+use_ssl = true
+```
+
+In a **single-domain forest**, the GC shows nothing a normal LDAP query
+doesn't already: there's only one domain to replicate, and
+`namingContexts` on the GC's rootDSE will list the same naming contexts as
+port 389/636. The GC also never exposes data from a *trusted* forest (see
+`msad trusts`) — trust relationships enable cross-forest
+authentication/authorization, not data federation; to query a trusted
+forest's own objects you need to connect to one of its own DCs/GCs
+separately.
+
 ## Usage
 
 ```bash
