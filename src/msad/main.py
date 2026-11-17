@@ -965,6 +965,82 @@ def privileged_groups(
 
 @app.command()
 @_handle_errors
+def fsmo_roles(
+    config_base: str | None = None,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+):
+    """Report the owner of each of the five FSMO roles (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.list_fsmo_roles(conn, config.base, config_base=config_base)
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def trusts(
+    limit: int = 0,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """List the domain's trust relationships (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.list_trusts(conn, config.base, limit=limit, attributes=attributes)
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def gpos(
+    limit: int = 0,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """List Group Policy Objects (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.list_gpos(conn, config.base, limit=limit, attributes=attributes)
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def gpo(
+    identifier: str,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Get a single GPO by its cn (GUID) or displayName (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.get_gpo(conn, config.base, identifier, attributes=attributes)
+    print(_pprint([result] if result else [], out_format))
+
+
+@app.command()
+@_handle_errors
+def fine_grained_password_policies(
+    limit: int = 0,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """List fine-grained password policies (PSOs) (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.list_fine_grained_password_policies(
+        conn, config.base, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
 def subnets(
     limit: int = 0,
     config_base: str | None = None,
