@@ -62,3 +62,15 @@ def test_pprint_json_handles_timedelta() -> None:
     parsed = json.loads(out)
     assert parsed["maxPwdAge"] == "66 days, 0:00:00"
     assert parsed["lockoutThreshold"] == 5
+
+
+def test_pprint_json_handles_bytes() -> None:
+    """Regression: binary attributes (msDS-KeyCredentialLink, raw
+    objectSid/objectGUID, ...) come back from ldap3 as bytes, which
+    json.dumps cannot serialize on its own (default() returning the same
+    object back raises "Circular reference detected")."""
+    entry = {"msDS-KeyCredentialLink": [b"\x01\x02\x03"], "cn": "PC01"}
+    out = _pprint([entry], OutFormat.jsonl).strip()
+    parsed = json.loads(out)
+    assert parsed["msDS-KeyCredentialLink"] == ["AQID"]
+    assert parsed["cn"] == "PC01"

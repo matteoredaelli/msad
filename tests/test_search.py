@@ -10,9 +10,12 @@ from msad.search import (
     DEFAULT_USER_ATTRIBUTES,
     disabled_users,
     find_admin_count_accounts,
+    find_admin_count_groups,
+    find_almost_locked_out,
     find_computers,
     find_computers_by_os,
     find_contacts,
+    find_credentials_in_description,
     find_disabled_computers,
     find_distribution_groups,
     find_empty_ous,
@@ -22,12 +25,14 @@ from msad.search import (
     find_must_change_password,
     find_never_expiring_accounts,
     find_not_delegated,
+    find_obsolete_os_computers,
     find_ous,
     find_password_not_required,
     find_recently_created,
     find_recently_modified,
     find_security_groups,
     find_service_accounts,
+    find_shadow_credentials,
     find_stale_computers,
     find_users,
     find_users_without_email,
@@ -515,7 +520,8 @@ def test_find_service_accounts_filter(conn) -> None:
     conn.queue([])
     find_service_accounts(conn, "dc=x")
     assert conn.last_filter == (
-        "(&(objectCategory=person)(objectClass=user)(servicePrincipalName=*))"
+        "(&(objectCategory=person)(objectClass=user)(servicePrincipalName=*)"
+        "(!(cn=krbtgt))(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"
     )
 
 
@@ -576,3 +582,62 @@ def test_find_recently_created_filter(conn) -> None:
     f = conn.last_filter
     assert "(objectClass=computer)" in f
     assert "(whenCreated>=" in f
+
+
+def test_find_admin_count_groups_filter(conn) -> None:
+    conn.queue([])
+    find_admin_count_groups(conn, "dc=x")
+    assert conn.last_filter == "(&(objectCategory=group)(adminCount=1))"
+
+
+def test_find_almost_locked_out_default_threshold(conn) -> None:
+    conn.queue([])
+    find_almost_locked_out(conn, "dc=x")
+    f = conn.last_filter
+    assert "(badPwdCount>=4)" in f
+    assert "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" in f
+    assert "badPwdCount" in conn.searches[-1].attributes
+
+
+def test_find_almost_locked_out_custom_threshold(conn) -> None:
+    conn.queue([])
+    find_almost_locked_out(conn, "dc=x", threshold=2)
+    assert "(badPwdCount>=2)" in conn.last_filter
+
+
+def test_find_credentials_in_description_default_keywords(conn) -> None:
+    conn.queue([])
+    find_credentials_in_description(conn, "dc=x")
+    f = conn.last_filter
+    assert "(description=*pass*)" in f
+    assert "(description=*pwd*)" in f
+    assert "description" in conn.searches[-1].attributes
+
+
+def test_find_credentials_in_description_custom_keywords(conn) -> None:
+    conn.queue([])
+    find_credentials_in_description(conn, "dc=x", keywords=["secret"])
+    f = conn.last_filter
+    assert "(description=*secret*)" in f
+    assert "pass" not in f
+
+
+def test_find_shadow_credentials_no_class(conn) -> None:
+    conn.queue([])
+    find_shadow_credentials(conn, "dc=x")
+    assert conn.last_filter == "(&(msDS-KeyCredentialLink=*))"
+
+
+def test_find_shadow_credentials_with_class(conn) -> None:
+    conn.queue([])
+    find_shadow_credentials(conn, "dc=x", object_class="computer")
+    assert conn.last_filter == "(&(objectClass=computer)(msDS-KeyCredentialLink=*))"
+
+
+def test_find_obsolete_os_computers_filter(conn) -> None:
+    conn.queue([])
+    find_obsolete_os_computers(conn, "dc=x")
+    f = conn.last_filter
+    assert f.startswith("(&(objectCategory=Computer)(|")
+    for pattern in ["Windows 2000*", "Windows XP*", "Windows Vista*", "Windows 7*", "Windows 8*"]:
+        assert f"(operatingSystem={pattern})" in f

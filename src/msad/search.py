@@ -989,7 +989,9 @@ def find_service_accounts(
 ) -> LdapEntries:
     """Find user accounts with a Service Principal Name (SPN) set.
 
-    Matches ``servicePrincipalName=*``. Any account with an SPN can have a
+    Matches ``servicePrincipalName=*``, excluding ``krbtgt`` (its SPN is not
+    attackable the same way) and disabled accounts (not usable for an
+    online/offline attack). Any remaining account with an SPN can have a
     Kerberos service ticket requested for it by any authenticated user, then
     cracked offline ("Kerberoasting") if its password is weak. A common
     hygiene/security-audit check.
@@ -997,7 +999,10 @@ def find_service_accounts(
     Returns:
         A list of matching user entries (default attributes if none given).
     """
-    search_filter = "(&(objectCategory=person)(objectClass=user)(servicePrincipalName=*))"
+    search_filter = (
+        "(&(objectCategory=person)(objectClass=user)(servicePrincipalName=*)"
+        "(!(cn=krbtgt))(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"
+    )
     return search(
         conn,
         base,
@@ -1038,6 +1043,34 @@ def find_admin_count_accounts(
     )
 
 
+def find_admin_count_groups(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find groups with ``adminCount=1`` (protected-group marker).
+
+    Complement of :func:`find_admin_count_accounts` on the group side: AD
+    sets ``adminCount=1`` on groups protected by AdminSDHolder (Domain
+    Admins, Enterprise Admins, Schema Admins, and any group nested under
+    them), and does not clear it automatically. Useful to spot groups that
+    carry the hardened, non-inherited ACL but may no longer need it.
+
+    Returns:
+        A list of matching group entries (default group attributes if none given).
+    """
+    search_filter = "(&(objectCategory=group)(adminCount=1))"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_GROUP_ATTRIBUTES,
+    )
+
+
 def find_must_change_password(
     conn: LdapConnection,
     base: str,
@@ -1066,6 +1099,175 @@ def find_must_change_password(
         search_filter,
         limit=limit,
         attributes=attributes or DEFAULT_USER_ATTRIBUTES,
+    )
+
+
+def find_almost_locked_out(
+    conn: LdapConnection,
+    base: str,
+    *,
+    threshold: int = 4,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find enabled users close to the lockout threshold.
+
+    Matches ``badPwdCount>=threshold`` (default 4), excluding disabled
+    accounts. ``badPwdCount`` resets on a successful logon or once the
+    domain's lockout observation window elapses, so this is a live,
+    point-in-time signal rather than a historical one. Useful both for
+    security (spotting a password-spraying attempt in progress) and for
+    IT support (users about to be locked out).
+
+    Args:
+        threshold: minimum bad-password count to flag (default 4; compare
+            against the domain's actual ``lockoutThreshold`` from
+            :func:`msad.audit.get_password_policy`).
+
+    Returns:
+        A list of matching user entries (default attributes, plus
+        ``badPwdCount``, if none given).
+    """
+    search_filter = (
+        "(&(objectCategory=person)(objectClass=user)"
+        f"(badPwdCount>={int(threshold)})"
+        "(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"
+    )
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or [*DEFAULT_USER_ATTRIBUTES, "badPwdCount"],
+    )
+
+
+def find_credentials_in_description(
+    conn: LdapConnection,
+    base: str,
+    *,
+    keywords: list[str] | None = None,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find users whose ``description`` may contain a plaintext credential.
+
+    A classic finding: admins sometimes note a password, PIN or hint directly
+    in the ``description`` field, which is readable by any authenticated
+    user by default.
+
+    Args:
+        keywords: substrings to look for in ``description`` (ORed, wrapped
+            in ``*`` wildcards, case-insensitive per LDAP semantics).
+            Defaults to ``["pass", "pwd"]``.
+
+    Returns:
+        A list of matching user entries (default attributes, plus
+        ``description``, if none given).
+    """
+    terms = keywords if keywords else ["pass", "pwd"]
+    inner = "".join(f"(description=*{escape_pattern(term)}*)" for term in terms)
+    search_filter = f"(&(objectCategory=person)(objectClass=user)(|{inner}))"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or [*DEFAULT_USER_ATTRIBUTES, "description"],
+    )
+
+
+#: Default attributes for :func:`find_shadow_credentials`: works across both
+#: user and computer objects, so it uses a minimal, type-agnostic set rather
+#: than DEFAULT_USER_ATTRIBUTES/DEFAULT_COMPUTER_ATTRIBUTES.
+DEFAULT_SHADOW_CREDENTIALS_ATTRIBUTES = [
+    "sAMAccountName",
+    "cn",
+    "objectClass",
+    "userAccountControl",
+    "msDS-KeyCredentialLink",
+    "whenChanged",
+    "distinguishedName",
+]
+
+
+def find_shadow_credentials(
+    conn: LdapConnection,
+    base: str,
+    *,
+    object_class: str | None = None,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find objects (users or computers) with a ``msDS-KeyCredentialLink``.
+
+    A populated ``msDS-KeyCredentialLink`` registers an alternate
+    certificate-based credential ("Shadow Credentials") that can authenticate
+    as the object without knowing its password — a common persistence/
+    privilege-escalation technique when an attacker has write access to this
+    attribute on a user or computer. Any hit on an account that shouldn't
+    have one configured is worth investigating.
+
+    Args:
+        object_class: restrict to ``"user"`` or ``"computer"``; omit to
+            match either.
+
+    Returns:
+        A list of matching entries (a minimal, type-agnostic attribute set
+        if none given; see ``DEFAULT_SHADOW_CREDENTIALS_ATTRIBUTES``).
+    """
+    class_filter = f"(objectClass={escape_exact(object_class)})" if object_class else ""
+    search_filter = f"(&{class_filter}(msDS-KeyCredentialLink=*))"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_SHADOW_CREDENTIALS_ATTRIBUTES,
+    )
+
+
+#: A commonly-cited set of end-of-life Windows OS name prefixes used in
+#: pentest/audit checklists. ``operatingSystem`` values are free text set by
+#: each machine, so this is best-effort pattern matching, not authoritative;
+#: review and update it periodically as newer OS versions reach EOL.
+_OBSOLETE_OS_PATTERNS = [
+    "Windows 2000*",
+    "Windows XP*",
+    "Windows Vista*",
+    "Windows 7*",
+    "Windows 8*",
+    "Windows Server 2003*",
+    "Windows Server 2008*",
+    "Windows Server 2012*",
+]
+
+
+def find_obsolete_os_computers(
+    conn: LdapConnection,
+    base: str,
+    *,
+    limit: int = 0,
+    attributes: Attributes = None,
+) -> LdapEntries:
+    """Find computers running a commonly-cited end-of-life Windows version.
+
+    ORs ``operatingSystem`` against a fixed list of legacy OS name prefixes
+    (Windows 2000/XP/Vista/7/8, Server 2003/2008/2012) often used in AD
+    security checklists. See :data:`_OBSOLETE_OS_PATTERNS`; for a custom or
+    up-to-date list, use :func:`find_computers_by_os` directly instead.
+
+    Returns:
+        A list of matching computer entries (default attributes if none given).
+    """
+    inner = "".join(f"(operatingSystem={pattern})" for pattern in _OBSOLETE_OS_PATTERNS)
+    search_filter = f"(&(objectCategory=Computer)(|{inner}))"
+    return search(
+        conn,
+        base,
+        search_filter,
+        limit=limit,
+        attributes=attributes or DEFAULT_COMPUTER_ATTRIBUTES,
     )
 
 

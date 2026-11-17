@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import base64
 import datetime
 import functools
 import getpass
@@ -73,9 +74,18 @@ def _json_converter(o: Any) -> Any:
         # get_domain_info: ldap3 decodes these AD "interval" attributes into
         # timedelta, which json.dumps cannot serialize on its own.
         return str(o)
+    elif isinstance(o, (bytes, bytearray)):
+        # Binary AD attributes (msDS-KeyCredentialLink, raw objectSid/
+        # objectGUID when not decoded, ...) aren't representable as JSON
+        # text; base64-encode rather than crashing on them.
+        return base64.b64encode(bytes(o)).decode("ascii")
     elif isinstance(o, list):
         return ";".join(o)
-    return o
+    # Anything else is a programming error, not expected AD data: raise
+    # instead of returning `o` unchanged, which would make json.dumps call
+    # default() on the same unconvertible object forever and fail with a
+    # confusing "Circular reference detected" instead of a clear TypeError.
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
 
 
 def _connect(domain: str | None, config_file: str | None) -> tuple[DomainConfig, ldap3.Connection]:
@@ -712,6 +722,24 @@ def admin_count_accounts(
 
 @app.command()
 @_handle_errors
+def admin_count_groups(
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find groups with adminCount=1 (current or stale protected-group marker)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_admin_count_groups(
+        conn, base or config.base, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
 def must_change_password(
     base: str | None = None,
     limit: int = 2000,
@@ -741,6 +769,81 @@ def users_without_email(
     """Data-quality check: find user accounts with no mail attribute set."""
     config, conn = _connect(domain, config_file)
     result = msad.find_users_without_email(
+        conn, base or config.base, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def almost_locked_out(
+    threshold: int = 4,
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find enabled users close to the lockout threshold (badPwdCount)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_almost_locked_out(
+        conn, base or config.base, threshold=threshold, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def credentials_in_description(
+    keyword: list[str] | None = None,
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Risk: find users whose description may contain a plaintext credential."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_credentials_in_description(
+        conn, base or config.base, keywords=keyword, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def shadow_credentials(
+    object_class: str | None = None,
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Risk: find users/computers with a msDS-KeyCredentialLink (Shadow Credentials)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_shadow_credentials(
+        conn, base or config.base, object_class=object_class, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def obsolete_os_computers(
+    base: str | None = None,
+    limit: int = 2000,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """Find computers running a commonly-cited end-of-life Windows version."""
+    config, conn = _connect(domain, config_file)
+    result = msad.find_obsolete_os_computers(
         conn, base or config.base, limit=limit, attributes=attributes
     )
     print(_pprint(result, out_format))
