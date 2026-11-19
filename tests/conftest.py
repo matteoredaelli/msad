@@ -92,6 +92,8 @@ class FakeConnection:
     searches: list[RecordedSearch] = field(default_factory=list)
     calls: list[tuple[Any, ...]] = field(default_factory=list)
     who_am_i_value: str | None = None
+    response: list[dict[str, Any]] = field(default_factory=list)
+    base_searches: list[tuple[Any, ...]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.extend = _Extend(self)
@@ -101,6 +103,13 @@ class FakeConnection:
     def modify(self, dn: str, changes: dict[str, Any]) -> bool:
         """Record a standard modify call (used by unlock_user) and succeed."""
         self.calls.append(("modify", dn, changes))
+        return True
+
+    def search(
+        self, search_base: str, search_filter: str, search_scope: Any = None, attributes: Any = None
+    ) -> bool:
+        """Record a plain (non-paged) search; ``response`` is set by the test."""
+        self.base_searches.append((search_base, search_filter, search_scope, attributes))
         return True
 
     # --- helpers for tests ---------------------------------------------

@@ -148,3 +148,83 @@ def whoami(conn: LdapConnection) -> str | None:
     """
     result = conn.extend.standard.who_am_i()
     return result if result else None
+
+
+#: rootDSE attributes worth surfacing (read anonymously-safe, DC-scoped).
+DEFAULT_ROOTDSE_ATTRIBUTES = [
+    "dnsHostName",
+    "serverName",
+    "dsServiceName",
+    "ldapServiceName",
+    "defaultNamingContext",
+    "rootDomainNamingContext",
+    "configurationNamingContext",
+    "schemaNamingContext",
+    "namingContexts",
+    "domainFunctionality",
+    "forestFunctionality",
+    "domainControllerFunctionality",
+    "isGlobalCatalogReady",
+    "isSynchronized",
+    "highestCommittedUSN",
+    "currentTime",
+    "supportedLDAPVersion",
+    "supportedSASLMechanisms",
+    "supportedCapabilities",
+    "supportedControl",
+]
+
+#: AD functional-level numbers (``msDS-Behavior-Version`` values) -> name.
+#: Level 7 covers Windows Server 2016 and later (2019/2022 use the same level).
+_FUNCTIONAL_LEVELS = {
+    0: "Windows 2000",
+    1: "Windows Server 2003 interim",
+    2: "Windows Server 2003",
+    3: "Windows Server 2008",
+    4: "Windows Server 2008 R2",
+    5: "Windows Server 2012",
+    6: "Windows Server 2012 R2",
+    7: "Windows Server 2016",
+}
+
+
+def get_rootdse_info(conn: LdapConnection, attributes: list[str] | None = None) -> dict[str, Any]:
+    """Read the rootDSE of the domain controller that answers this connection.
+
+    The rootDSE is per-DC (not per-domain): it reports which DC you are talking
+    to (``dnsHostName``, ``serverName``), the naming contexts, the domain/forest/
+    DC functional levels and the supported controls/capabilities. Adds
+    ``*_name`` companions for the three functional levels (e.g.
+    ``domainFunctionality_name``).
+
+    Args:
+        attributes: attributes to keep (defaults to a curated set).
+
+    Returns:
+        The rootDSE attributes as a plain dict (empty if the server returned none).
+    """
+    wanted = attributes or DEFAULT_ROOTDSE_ATTRIBUTES
+    # Ask for everything ("*" + operational "+"): ldap3 validates explicit
+    # attribute names against the schema, and many rootDSE attributes are not
+    # in it. The selection is applied client-side below.
+    conn.search(
+        "", "(objectClass=*)", search_scope=ldap3.BASE, attributes=[ldap3.ALL_ATTRIBUTES, "+"]
+    )
+    response = [r for r in (conn.response or []) if "attributes" in r]
+    if not response:
+        return {}
+    wanted_lc = {w.lower() for w in wanted}
+    info: dict[str, Any] = {
+        str(k): v for k, v in response[0]["attributes"].items() if str(k).lower() in wanted_lc
+    }
+    for key in ("domainFunctionality", "forestFunctionality", "domainControllerFunctionality"):
+        raw = info.get(key)
+        if isinstance(raw, list):
+            raw = raw[0] if raw else None
+        try:
+            level = int(raw) if raw is not None else None
+        except (TypeError, ValueError):
+            level = None
+        if level is not None:
+            info[f"{key}_name"] = _FUNCTIONAL_LEVELS.get(level, f"Unknown ({level})")
+    return info

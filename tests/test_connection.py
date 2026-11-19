@@ -166,3 +166,43 @@ def test_whoami_returns_none_when_unset(conn) -> None:
 
     conn.who_am_i_value = None
     assert whoami(conn) is None
+
+
+def test_get_rootdse_info_decodes_functional_levels(conn) -> None:
+    import ldap3
+
+    from msad import DEFAULT_ROOTDSE_ATTRIBUTES, get_rootdse_info
+
+    conn.response = [
+        {
+            "attributes": {
+                "dnsHostName": "dc1.example.com",
+                "domainFunctionality": ["7"],
+                "forestFunctionality": ["6"],
+                "ignoredAttr": "x",
+                "domainControllerFunctionality": ["99"],
+            }
+        }
+    ]
+    info = get_rootdse_info(conn)
+    base, flt, scope, attrs = conn.base_searches[-1]
+    assert base == ""
+    assert flt == "(objectClass=*)"
+    assert scope == ldap3.BASE
+    assert attrs == [ldap3.ALL_ATTRIBUTES, "+"]
+    assert set(info) <= set(DEFAULT_ROOTDSE_ATTRIBUTES) | {
+        "domainFunctionality_name",
+        "forestFunctionality_name",
+        "domainControllerFunctionality_name",
+    }
+    assert info["dnsHostName"] == "dc1.example.com"
+    assert info["domainFunctionality_name"] == "Windows Server 2016"
+    assert info["forestFunctionality_name"] == "Windows Server 2012 R2"
+    assert info["domainControllerFunctionality_name"] == "Unknown (99)"
+
+
+def test_get_rootdse_info_empty_response(conn) -> None:
+    from msad import get_rootdse_info
+
+    conn.response = list[dict[str, object]]()
+    assert get_rootdse_info(conn) == {}

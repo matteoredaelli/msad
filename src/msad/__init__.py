@@ -71,7 +71,13 @@ from .config import (
     load_domain_config,
     resolve_domain_config,
 )
-from .connection import check_connection, connect, whoami
+from .connection import (
+    DEFAULT_ROOTDSE_ATTRIBUTES,
+    check_connection,
+    connect,
+    get_rootdse_info,
+    whoami,
+)
 from .decode import (
     decode_dns_record,
     decode_dns_records,
@@ -183,6 +189,8 @@ __all__ = [
     "connect",
     "check_connection",
     "whoami",
+    "get_rootdse_info",
+    "DEFAULT_ROOTDSE_ATTRIBUTES",
     # decode (pure attribute decoders)
     "decode_entry",
     "decode_entries",

@@ -213,6 +213,19 @@ def whoami(
 
 @app.command()
 @_handle_errors
+def rootdse(
+    domain: str | None = None,
+    config_file: str | None = None,
+    attributes: list[str] | None = None,
+):
+    """Show the rootDSE of the DC answering this connection (functional levels, naming contexts)."""
+    _, conn = _connect(domain, config_file)
+    result = msad.get_rootdse_info(conn, attributes=attributes)
+    print(json.dumps(_plain(result), default=_json_converter, indent=2))
+
+
+@app.command()
+@_handle_errors
 def search(
     filter: str,
     limit: int = 2000,
