@@ -1143,6 +1143,52 @@ def servers(
 
 @app.command()
 @_handle_errors
+def replication_connections(
+    limit: int = 0,
+    config_base: str | None = None,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """List the replication topology (nTDSConnection objects) (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.list_replication_connections(
+        conn, config.base, config_base=config_base, limit=limit, attributes=attributes
+    )
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def replication_conflicts(
+    limit: int = 0,
+    domain: str | None = None,
+    config_file: str | None = None,
+    out_format: OutFormat = OutFormat.jsonl,
+    attributes: list[str] | None = None,
+):
+    """List replication-conflict (CNF:) objects (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.list_replication_conflicts(conn, config.base, limit=limit, attributes=attributes)
+    print(_pprint(result, out_format))
+
+
+@app.command()
+@_handle_errors
+def first_look(
+    config_base: str | None = None,
+    domain: str | None = None,
+    config_file: str | None = None,
+):
+    """One-call overview: domain, policy, FSMO, DCs, sites, trusts, replication (audit)."""
+    config, conn = _connect(domain, config_file)
+    result = msad.first_look(conn, config.base, config_base=config_base)
+    print(json.dumps(result, default=_json_converter, indent=2))
+
+
+@app.command()
+@_handle_errors
 def dns_zones(
     limit: int = 0,
     zone_base: str | None = None,

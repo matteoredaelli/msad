@@ -524,3 +524,68 @@ def test_list_psos_filter_and_base(conn, make_entry) -> None:
     assert last.search_filter == "(objectClass=msDS-PasswordSettings)"
     assert last.attributes == DEFAULT_PSO_ATTRIBUTES
     assert result[0]["cn"] == "PSO-Admins"
+
+
+def test_list_replication_connections_decodes_topology(conn, make_entry) -> None:
+    from msad.audit import list_replication_connections
+
+    dn = (
+        "CN=abc,CN=NTDS Settings,CN=DC2,CN=Servers,CN=Milan,CN=Sites,"
+        "CN=Configuration,DC=example,DC=com"
+    )
+    conn.queue(
+        [
+            make_entry(
+                {
+                    "distinguishedName": dn,
+                    "fromServer": (
+                        "CN=NTDS Settings,CN=DC1,CN=Servers,CN=Rome,CN=Sites,"
+                        "CN=Configuration,DC=example,DC=com"
+                    ),
+                    "options": 1,
+                    "enabledConnection": True,
+                },
+                dn=dn,
+            )
+        ]
+    )
+    result = list_replication_connections(conn, "DC=example,DC=com")
+    last = conn.searches[-1]
+    assert last.search_base == "CN=Sites,CN=Configuration,DC=example,DC=com"
+    assert last.search_filter == "(objectClass=nTDSConnection)"
+    assert result[0]["destination_dc"] == "DC2"
+    assert result[0]["site"] == "Milan"
+    assert result[0]["source_dc"] == "DC1"
+    assert result[0]["source_site"] == "Rome"
+    assert result[0]["kcc_generated"] is True
+
+
+def test_list_replication_conflicts_filter(conn, make_entry) -> None:
+    from msad.audit import list_replication_conflicts
+
+    conn.queue([make_entry({"name": "x\nCNF:1234"})])
+    result = list_replication_conflicts(conn, "DC=example,DC=com")
+    assert "\\0aCNF:" in conn.searches[-1].search_filter
+    assert len(result) == 1
+
+
+def test_first_look_aggregates_and_warns(conn, make_entry) -> None:
+    from msad.audit import first_look
+
+    # domain, policy, 5 fsmo, dcs, sites, trusts, connections, conflicts
+    conn.queue([make_entry({"name": "example"})])
+    conn.queue([make_entry({"minPwdLength": 8})])
+    for _ in range(5):
+        conn.queue([make_entry({"fSMORoleOwner": "CN=NTDS Settings,CN=DC1"})])
+    conn.queue([make_entry({"name": "DC1"})])
+    conn.queue([make_entry({"name": "Default-First-Site-Name"})])
+    conn.queue([])
+    conn.queue([])
+    conn.queue([make_entry({"name": "a\nCNF:1"})])
+    report = first_look(conn, "DC=example,DC=com")
+    assert report["domain"]["name"] == "example"
+    assert len(report["fsmo_roles"]) == 5
+    assert report["summary"]["domain_controllers"] == 1
+    assert report["summary"]["replication_conflicts"] == 1
+    assert report["summary"]["warnings"]
+    assert report["errors"] == {}
