@@ -25,7 +25,7 @@ import getpass
 import json
 import logging
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -86,6 +86,15 @@ def _json_converter(o: Any) -> Any:
     # default() on the same unconvertible object forever and fail with a
     # confusing "Circular reference detected" instead of a clear TypeError.
     raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+
+
+def _plain(obj: Any) -> Any:
+    """Recursively turn ldap3 CaseInsensitiveDict (not a dict) into plain dicts."""
+    if isinstance(obj, Mapping):
+        return {str(k): _plain(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_plain(v) for v in obj]
+    return obj
 
 
 def _connect(domain: str | None, config_file: str | None) -> tuple[DomainConfig, ldap3.Connection]:
@@ -1184,7 +1193,7 @@ def first_look(
     """One-call overview: domain, policy, FSMO, DCs, sites, trusts, replication (audit)."""
     config, conn = _connect(domain, config_file)
     result = msad.first_look(conn, config.base, config_base=config_base)
-    print(json.dumps(result, default=_json_converter, indent=2))
+    print(json.dumps(_plain(result), default=_json_converter, indent=2))
 
 
 @app.command()

@@ -734,8 +734,8 @@ def first_look(
     Returns:
         A dict with ``domain``, ``password_policy``, ``fsmo_roles``,
         ``domain_controllers``, ``sites``, ``trusts``, ``replication_connections``,
-        ``replication_conflicts`` (up to 50 listed, with the full count in
-        ``summary``), ``summary`` (counts and warnings) and ``errors``.
+        ``replication_conflicts`` (first 50 listed; the count in
+        ``summary`` is capped at 1000), ``summary`` (counts and warnings) and ``errors``.
     """
     from .search import list_domain_controllers
 
@@ -764,7 +764,7 @@ def first_look(
         lambda: list_replication_connections(conn, base, config_base=config_base),
     )
     conflicts = collect(
-        "replication_conflicts", lambda: list_replication_conflicts(conn, base, limit=50)
+        "replication_conflicts", lambda: list_replication_conflicts(conn, base, limit=1000)
     )
 
     warnings: list[str] = []
@@ -786,7 +786,7 @@ def first_look(
         "sites": sites,
         "trusts": trusts,
         "replication_connections": conns,
-        "replication_conflicts": conflicts,
+        "replication_conflicts": None if conflicts is None else conflicts[:50],
         "summary": {
             "domain_controllers": count(dcs),
             "sites": count(sites),
