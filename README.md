@@ -1,6 +1,6 @@
 # msAD
 
-![The msad ecosystem: msad at the core, with mcpAD (MCP), restAD (REST) and graphqlAD (GraphQL) around it](docs/ecosystem.svg)
+![The msad ecosystem: msad at the core, with mcpAD (MCP), restAD (REST) and graphqlAD (GraphQL) around it](docs/msad.svg)
 
 *msad* is a library and command line tool for working with an Active Directory / LDAP
 server from Unix, Linux and macOS systems.

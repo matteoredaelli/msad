@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-labelledby="title desc">
+  <title id="title">msad — Active Directory toolkit</title>
+  <desc id="desc">An Active Directory triangle connected to REST AD, GraphQL AD and MCP AD, with the msad wordmark.</desc>
+  <defs>
+    <linearGradient id="tri" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#13b8ff"/><stop offset=".52" stop-color="#0862d9"/><stop offset="1" stop-color="#062b78"/></linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#13b8ff"/><stop offset="1" stop-color="#063baf"/></linearGradient>
+    <linearGradient id="purple" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c52cff"/><stop offset="1" stop-color="#4220a7"/></linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#48dc20"/><stop offset="1" stop-color="#00835b"/></linearGradient>
+    <linearGradient id="word" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#061e4d"/><stop offset=".58" stop-color="#0754c9"/><stop offset="1" stop-color="#087df1"/></linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="12"/></filter>
+  </defs>
+  <g fill="none" stroke-linecap="round" stroke-width="15">
+    <path d="M300 250 C330 155 405 105 500 105 C595 105 670 155 700 250" stroke="url(#blue)"/>
+    <path d="M260 300 C205 365 205 465 270 525" stroke="url(#purple)"/>
+    <path d="M740 300 C795 365 795 465 730 525" stroke="url(#green)"/>
+  </g>
+  <g>
+    <circle cx="500" cy="125" r="105" fill="url(#blue)"/>
+    <text x="500" y="115" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="66" font-weight="700">&lt;/&gt;</text>
+    <text x="500" y="165" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="29" font-weight="700" letter-spacing="1">REST AD</text>
+    <circle cx="230" cy="405" r="112" fill="url(#purple)"/>
+    <g stroke="#fff" stroke-width="8" fill="none" stroke-linecap="round"><path d="M230 338 L175 390 L180 447 L282 447 L286 390 Z M175 390 L282 447 M286 390 L180 447 M230 338 L230 470"/></g>
+    <g fill="#fff"><circle cx="230" cy="338" r="13"/><circle cx="175" cy="390" r="13"/><circle cx="286" cy="390" r="13"/><circle cx="180" cy="447" r="13"/><circle cx="282" cy="447" r="13"/><circle cx="230" cy="470" r="13"/></g>
+    <text x="230" y="510" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="27" font-weight="700">GRAPHQL AD</text>
+    <circle cx="770" cy="405" r="112" fill="url(#green)"/>
+    <g fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"><path d="M718 425 L775 354 Q795 333 812 350 Q829 367 810 387 L759 443 Q742 462 727 447 Q713 432 730 415 L781 360"/><path d="M749 452 L800 397 Q818 378 834 394 Q850 410 832 428 L781 481 Q764 498 748 482"/></g>
+    <text x="770" y="510" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="29" font-weight="700">MCP AD</text>
+  </g>
+  <path d="M500 265 L755 690 L245 690 Z" fill="url(#tri)"/>
+  <path d="M500 300 L714 660 L286 660 Z" fill="#07347e" opacity=".55"/>
+  <g stroke="#fff" stroke-width="13" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M500 470 L390 535 L390 570 M500 470 L500 570 M500 470 L610 535 L610 570"/></g>
+  <g fill="#fff"><circle cx="500" cy="430" r="36"/><circle cx="390" cy="610" r="36"/><circle cx="500" cy="610" r="36"/><circle cx="610" cy="610" r="36"/></g>
+  <text x="500" y="835" text-anchor="middle" fill="url(#word)" font-family="Arial,sans-serif" font-size="158" font-weight="800" letter-spacing="-8">msad</text>
+  <path d="M225 875 Q500 960 775 875" fill="none" stroke="#0878e8" stroke-width="7" stroke-linecap="round" opacity=".8"/>
+  <g transform="translate(500 910)"><path d="M-35 -18 Q-35 -42 0 -42 L28 -42 Q46 -42 46 -22 L46 0 L-4 0 Q-26 0 -26 20 L-26 33 L-48 33 L-48 -2 Q-48 -18 -35 -18Z" fill="#2876b7"/><path d="M35 18 Q35 42 0 42 L-28 42 Q-46 42 -46 22 L-46 0 L4 0 Q26 0 26 -20 L26 -33 L48 -33 L48 2 Q48 18 35 18Z" fill="#ffd43b"/><circle cx="27" cy="-27" r="5" fill="#fff"/><circle cx="-27" cy="27" r="5" fill="#fff"/></g>
+</svg>
